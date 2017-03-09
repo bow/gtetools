@@ -1,0 +1,8 @@
+[package]
+name = "gfxtools"
+version = "0.1.0"
+authors = ["bow <bow@bow.web.id>"]
+
+[dependencies]
+bio = "0.11.0"
+clap = "2.20.5"
