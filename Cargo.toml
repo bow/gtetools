@@ -5,4 +5,8 @@ authors = ["bow <bow@bow.web.id>"]
 
 [dependencies]
 bio = "0.11.0"
-clap = "2.20.5"
+
+[dependencies.clap]
+version = "~2.20.5"
+default-features = false
+features = ["suggestions", "wrap_help"]
