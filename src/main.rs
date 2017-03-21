@@ -10,6 +10,7 @@ mod feature;
 mod tools;
 
 
+/// Main entry point.
 fn main() {
     let matches = cli::build_cli().get_matches();
     if let Err(err) = cli::run(matches) {
