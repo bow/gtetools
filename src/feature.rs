@@ -5,9 +5,6 @@ use std::collections::HashMap;
 use bio::io::Strand;
 
 
-const ERR_MSG_COORD: &'static str = "interval start coordinate larger than its end coordinate";
-
-
 pub struct Feature;
 
 impl Feature {
@@ -19,6 +16,13 @@ impl Feature {
     }
     fn exon() -> Exon {
         Exon::default()
+    }
+    fn validate_interval<T: Interval>(ival: T) -> Result<T, &'static str> {
+        if ival.start() > ival.end() {
+            return Err("interval start coordinate larger than its end coordinate")
+        }
+
+        Ok(ival)
     }
 }
 
@@ -81,11 +85,7 @@ impl Interval for Gene {
     }
 
     fn validate(self) -> Result<Self, &'static str> {
-        if self.start() > self.end() {
-            Err(ERR_MSG_COORD)
-        } else {
-            Ok(self)
-        }
+        Feature::validate_interval(self)
     }
 }
 
@@ -160,11 +160,7 @@ impl Interval for Transcript {
     }
 
     fn validate(self) -> Result<Self, &'static str> {
-        if self.start() > self.end() {
-            Err(ERR_MSG_COORD)
-        } else {
-            Ok(self)
-        }
+        Feature::validate_interval(self)
     }
 }
 
@@ -215,11 +211,7 @@ impl Interval for Exon {
     }
 
     fn validate(self) -> Result<Self, &'static str> {
-        if self.start() > self.end() {
-            Err(ERR_MSG_COORD)
-        } else {
-            Ok(self)
-        }
+        Feature::validate_interval(self)
     }
 }
 
