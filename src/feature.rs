@@ -4,6 +4,37 @@ use std::collections::HashMap;
 
 use bio::io::Strand;
 
+use self::error::FeatureError;
+
+
+pub mod error {
+
+    use std::error::Error;
+    use std::fmt;
+
+    #[derive(Debug)]
+    pub enum FeatureError {
+        InvalidCoords,
+    }
+
+    impl Error for FeatureError {
+        fn description(&self) -> &str {
+            match *self {
+                FeatureError::InvalidCoords => "interval start coordinate larger than its end coordinate"
+            }
+        }
+
+        fn cause(&self) -> Option<&Error> {
+            None
+        }
+    }
+
+    impl fmt::Display for FeatureError {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(f, "FeatureError: {}", self.description())
+        }
+    }
+}
 
 /// Interface for features with start and end coordinates.
 ///
@@ -19,7 +50,7 @@ pub trait Interval: Sized {
     fn end(&self) -> u64;
 
     /// Performs various validation of the interval.
-    fn validate(self) -> Result<Self, &'static str>;
+    fn validate(self) -> Result<Self, FeatureError>;
 
     /// The number of bases covered by the interval.
     fn span(&self) -> u64 {
@@ -46,9 +77,9 @@ pub trait Interval: Sized {
     ///
     /// If the validation fails, an error message is returned within
     /// the `Result` type.
-    fn validate_coords(self) -> Result<Self, &'static str> {
+    fn validate_coords(self) -> Result<Self, FeatureError> {
         if self.start() > self.end() {
-            return Err("interval start coordinate larger than its end coordinate")
+            return Err(FeatureError::InvalidCoords)
         }
 
         Ok(self)
@@ -132,7 +163,7 @@ impl Interval for Feature {
         self.end
     }
 
-    fn validate(self) -> Result<Self, &'static str> {
+    fn validate(self) -> Result<Feature, FeatureError> {
         self.validate_coords()
     }
 }
@@ -180,7 +211,7 @@ impl Interval for Gene {
         self.end
     }
 
-    fn validate(self) -> Result<Self, &'static str> {
+    fn validate(self) -> Result<Gene, FeatureError> {
         self.validate_coords()
     }
 }
@@ -259,7 +290,7 @@ impl Interval for Transcript {
         self.end
     }
 
-    fn validate(self) -> Result<Self, &'static str> {
+    fn validate(self) -> Result<Transcript, FeatureError> {
         self.validate_coords()
     }
 }
@@ -313,7 +344,7 @@ impl Interval for Exon {
         self.end
     }
 
-    fn validate(self) -> Result<Self, &'static str> {
+    fn validate(self) -> Result<Exon, FeatureError> {
         self.validate_coords()
     }
 }
