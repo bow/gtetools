@@ -6,8 +6,8 @@ use std::process;
 use std::io::{self, Write};
 
 mod cli;
-mod feature;
 mod tools;
+pub mod feature;
 
 
 /// Main entry point.

@@ -26,7 +26,7 @@ impl Feature {
     /// assert_eq!(gene.end(), 0);
     /// assert_eq!(gene.name(), None);
     /// ```
-    fn gene() -> Gene {
+    pub fn gene() -> Gene {
         Gene::default()
     }
 
@@ -47,7 +47,7 @@ impl Feature {
     /// assert_eq!(transcript.end(), 0);
     /// assert_eq!(transcript.name(), None);
     /// ```
-    fn transcript() -> Transcript {
+    pub fn transcript() -> Transcript {
         Transcript::default()
     }
 
@@ -62,7 +62,7 @@ impl Feature {
     /// assert_eq!(exon.end(), 0);
     /// assert_eq!(exon.name(), None);
     /// ```
-    fn exon() -> Exon {
+    pub fn exon() -> Exon {
         Exon::default()
     }
 
@@ -70,7 +70,7 @@ impl Feature {
     ///
     /// If the validation fails, an error message is returned within
     /// the `Result` type.
-    fn validate_interval<T: Interval>(ival: T) -> Result<T, &'static str> {
+    pub fn validate_interval<T: Interval>(ival: T) -> Result<T, &'static str> {
         if ival.start() > ival.end() {
             return Err("interval start coordinate larger than its end coordinate")
         }
@@ -84,7 +84,7 @@ impl Feature {
 /// The intervals represented here are zero-based, half open intervals.
 /// Coordinates start from zero and start coordinates must be less than
 /// or equal to the end coordinates.
-trait Interval: Sized {
+pub trait Interval: Sized {
 
     /// Start coordinate of the interval.
     fn start(&self) -> u64;
@@ -128,16 +128,18 @@ pub struct Gene {
 }
 
 impl Gene {
-    fn name(&self) -> Option<&str> {
+
+    pub fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| n.as_str())
     }
 
-    fn transcripts(&self) -> &HashMap<String, Transcript> {
+    pub fn transcripts(&self) -> &HashMap<String, Transcript> {
         &self.transcripts
     }
 }
 
 impl Interval for Gene {
+
     fn start(&self) -> u64 {
         self.start
     }
@@ -178,6 +180,7 @@ pub struct Transcript {
 }
 
 impl Default for Transcript {
+
     fn default() -> Transcript {
         Transcript {
             name: None,
@@ -192,28 +195,30 @@ impl Default for Transcript {
 }
 
 impl Transcript {
-    fn name(&self) -> Option<&str> {
+
+    pub fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| n.as_str())
     }
 
-    fn strand(&self) -> &Strand {
+    pub fn strand(&self) -> &Strand {
         &self.strand
     }
 
-    fn cds_start(&self) -> Option<u64> {
+    pub fn cds_start(&self) -> Option<u64> {
         self.cds_start
     }
 
-    fn cds_end(&self) -> Option<u64> {
+    pub fn cds_end(&self) -> Option<u64> {
         self.cds_end
     }
 
-    fn exons(&self) -> &Vec<Exon> {
+    pub fn exons(&self) -> &Vec<Exon> {
         &self.exons
     }
 }
 
 impl Interval for Transcript {
+
     fn start(&self) -> u64 {
         self.start
     }
@@ -253,11 +258,12 @@ pub struct Exon {
 }
 
 impl Exon {
-    fn name(&self) -> Option<&str> {
+
+    pub fn name(&self) -> Option<&str> {
         self.name.as_ref().map(|n| n.as_str())
     }
 
-    fn with_name<T>(mut self, n: T) -> Exon
+    pub fn with_name<T>(mut self, n: T) -> Exon
         where T: Into<String>
     {
         self.name = Some(n.into());
@@ -266,6 +272,7 @@ impl Exon {
 }
 
 impl Interval for Exon {
+
     fn start(&self) -> u64 {
         self.start
     }
