@@ -65,18 +65,6 @@ impl Feature {
     pub fn exon() -> Exon {
         Exon::default()
     }
-
-    /// Performs validation of the interval values.
-    ///
-    /// If the validation fails, an error message is returned within
-    /// the `Result` type.
-    pub fn validate_interval<T: Interval>(ival: T) -> Result<T, &'static str> {
-        if ival.start() > ival.end() {
-            return Err("interval start coordinate larger than its end coordinate")
-        }
-
-        Ok(ival)
-    }
 }
 
 /// Interface for features with start and end coordinates.
@@ -115,6 +103,18 @@ pub trait Interval: Sized {
     fn adjacent(&self, other: &Self) -> bool {
         self.end() == other.start() || self.start() == other.end()
     }
+
+    /// Performs validation of the interval coordinates.
+    ///
+    /// If the validation fails, an error message is returned within
+    /// the `Result` type.
+    fn validate_coords(self) -> Result<Self, &'static str> {
+        if self.start() > self.end() {
+            return Err("interval start coordinate larger than its end coordinate")
+        }
+
+        Ok(self)
+    }
 }
 
 
@@ -149,7 +149,7 @@ impl Interval for Gene {
     }
 
     fn validate(self) -> Result<Self, &'static str> {
-        Feature::validate_interval(self)
+        self.validate_coords()
     }
 }
 
@@ -228,7 +228,7 @@ impl Interval for Transcript {
     }
 
     fn validate(self) -> Result<Self, &'static str> {
-        Feature::validate_interval(self)
+        self.validate_coords()
     }
 }
 
@@ -282,7 +282,7 @@ impl Interval for Exon {
     }
 
     fn validate(self) -> Result<Self, &'static str> {
-        Feature::validate_interval(self)
+        self.validate_coords()
     }
 }
 
