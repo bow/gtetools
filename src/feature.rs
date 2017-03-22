@@ -5,10 +5,65 @@ use std::collections::HashMap;
 use bio::io::Strand;
 
 
-/// Builder for exons, transcripts, or genes.
+/// Interface for features with start and end coordinates.
 ///
-/// Use this struct to initialize annotation features with the default values.
-pub struct Feature;
+/// The intervals represented here are zero-based, half open intervals.
+/// Coordinates start from zero and start coordinates must be less than
+/// or equal to the end coordinates.
+pub trait Interval: Sized {
+
+    /// Start coordinate of the interval.
+    fn start(&self) -> u64;
+
+    /// End coordinate of the interval.
+    fn end(&self) -> u64;
+
+    /// Performs various validation of the interval.
+    fn validate(self) -> Result<Self, &'static str>;
+
+    /// The number of bases covered by the interval.
+    fn span(&self) -> u64 {
+        self.end() - self.start()
+    }
+
+    /// Whether two intervals have an intersection or not.
+    fn overlaps(&self, other: &Self) -> bool {
+        (other.start() <= self.start() && self.start() <= other.end()) ||
+        (other.start() <= self.end() && self.end() <= other.end())
+    }
+
+    /// Whether one interval completely contains the other.
+    fn envelops(&self, other: &Self) -> bool {
+        self.start() <= other.start() && self.end() >= other.end()
+    }
+
+    /// Whether two intervals cover a contiguous region without any overlaps.
+    fn adjacent(&self, other: &Self) -> bool {
+        self.end() == other.start() || self.start() == other.end()
+    }
+
+    /// Performs validation of the interval coordinates.
+    ///
+    /// If the validation fails, an error message is returned within
+    /// the `Result` type.
+    fn validate_coords(self) -> Result<Self, &'static str> {
+        if self.start() > self.end() {
+            return Err("interval start coordinate larger than its end coordinate")
+        }
+
+        Ok(self)
+    }
+}
+
+
+/// Default implementation of the `Interval` trait.
+///
+/// This struct also provides static methods for creating exons, transcripts, and genes.
+#[derive(Debug, Default)]
+pub struct Feature {
+    start: u64,
+    end: u64,
+}
 
 impl Feature {
 
@@ -67,56 +122,33 @@ impl Feature {
     }
 }
 
-/// Interface for features with start and end coordinates.
-///
-/// The intervals represented here are zero-based, half open intervals.
-/// Coordinates start from zero and start coordinates must be less than
-/// or equal to the end coordinates.
-pub trait Interval: Sized {
+impl Interval for Feature {
 
-    /// Start coordinate of the interval.
-    fn start(&self) -> u64;
-
-    /// End coordinate of the interval.
-    fn end(&self) -> u64;
-
-    /// Performs various validation of the interval.
-    fn validate(self) -> Result<Self, &'static str>;
-
-    /// The number of bases covered by the interval.
-    fn span(&self) -> u64 {
-        self.end() - self.start()
+    fn start(&self) -> u64 {
+        self.start
     }
 
-    /// Whether two intervals have an intersection or not.
-    fn overlaps(&self, other: &Self) -> bool {
-        (other.start() <= self.start() && self.start() <= other.end()) ||
-        (other.start() <= self.end() && self.end() <= other.end())
+    fn end(&self) -> u64 {
+        self.end
     }
 
-    /// Whether one interval completely contains the other.
-    fn envelops(&self, other: &Self) -> bool {
-        self.start() <= other.start() && self.end() >= other.end()
-    }
-
-    /// Whether two intervals cover a contiguous region without any overlaps.
-    fn adjacent(&self, other: &Self) -> bool {
-        self.end() == other.start() || self.start() == other.end()
-    }
-
-    /// Performs validation of the interval coordinates.
-    ///
-    /// If the validation fails, an error message is returned within
-    /// the `Result` type.
-    fn validate_coords(self) -> Result<Self, &'static str> {
-        if self.start() > self.end() {
-            return Err("interval start coordinate larger than its end coordinate")
-        }
-
-        Ok(self)
+    fn validate(self) -> Result<Self, &'static str> {
+        self.validate_coords()
     }
 }
 
+#[cfg(test)]
+mod test_feature {
+    use super::*;
+
+    #[test]
+    fn default() {
+        let fx = Feature::default();
+        assert_eq!(fx.start(), 0);
+        assert_eq!(fx.end(), 0);
+        assert!(fx.validate().is_ok());
+    }
+}
 
 /// Gene annotation.
 #[derive(Debug, Default)]
