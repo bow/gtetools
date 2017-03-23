@@ -305,6 +305,40 @@ pub struct Transcript {
     exons: Vec<Exon>,
 }
 
+impl Transcript {
+
+    pub fn strand(&self) -> &Strand {
+        &self.strand
+    }
+
+    pub fn with_strand(mut self, strand: Strand) -> Transcript {
+        self.strand = strand;
+        self
+    }
+
+    pub fn cds_start(&self) -> Option<u64> {
+        self.cds_start
+    }
+
+    pub fn with_cds_start(mut self, cds_start: u64) -> Transcript {
+        self.cds_start = Some(cds_start);
+        self
+    }
+
+    pub fn cds_end(&self) -> Option<u64> {
+        self.cds_end
+    }
+
+    pub fn with_cds_end(mut self, cds_end: u64) -> Transcript {
+        self.cds_end = Some(cds_end);
+        self
+    }
+
+    pub fn exons(&self) -> &Vec<Exon> {
+        &self.exons
+    }
+}
+
 impl Default for Transcript {
 
     fn default() -> Transcript {
@@ -317,25 +351,6 @@ impl Default for Transcript {
             cds_end: None,
             exons: Vec::new(),
         }
-    }
-}
-
-impl Transcript {
-
-    pub fn strand(&self) -> &Strand {
-        &self.strand
-    }
-
-    pub fn cds_start(&self) -> Option<u64> {
-        self.cds_start
-    }
-
-    pub fn cds_end(&self) -> Option<u64> {
-        self.cds_end
-    }
-
-    pub fn exons(&self) -> &Vec<Exon> {
-        &self.exons
     }
 }
 
@@ -355,6 +370,27 @@ mod test_transcript {
         assert_eq!(trx.cds_start(), None);
         assert_eq!(trx.cds_end(), None);
         assert_eq!(trx.exons().len(), 0);
+    }
+
+    #[test]
+    fn with_strand() {
+        let trx = Feature::transcript()
+            .with_strand(Strand::Forward);
+        assert_eq!(trx.strand(), &Strand::Forward);
+    }
+
+    #[test]
+    fn with_cds_start() {
+        let trx = Feature::transcript()
+            .with_cds_start(20);
+        assert_eq!(trx.cds_start(), Some(20));
+    }
+
+    #[test]
+    fn with_cds_end() {
+        let trx = Feature::transcript()
+            .with_cds_end(40);
+        assert_eq!(trx.cds_end(), Some(40))
     }
 }
 
