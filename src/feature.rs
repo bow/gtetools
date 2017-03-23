@@ -52,10 +52,15 @@ pub trait Interval: Sized {
     /// Name of the interval.
     fn name(&self) -> Option<&str>;
 
-    /// Name setter that returns the struct itself.
+    /// Name setter that returns the implementor itself.
     ///
-    /// This function is expected to mutate the implementing struct.
+    /// This function is expected to mutate the implementing type.
     fn with_name<T: Into<String>>(self, name: T) -> Self;
+
+    /// Coordinate setter that returns the implementor itself.
+    ///
+    /// This function is expected to mutate the implementing type.
+    fn with_coords(self, start: u64, end: u64) -> Self;
 
     /// Performs various validation of the interval.
     fn validate(self) -> Result<Self, FeatureError> {
@@ -121,6 +126,12 @@ macro_rules! impl_interval {
                 where T: Into<String>
             {
                 self.name = Some(name.into());
+                self
+            }
+
+            fn with_coords(mut self, start: u64, end: u64) -> $struct_ty {
+                self.start = start;
+                self.end = end;
                 self
             }
         }
@@ -228,6 +239,25 @@ mod test_feature {
         assert_eq!(fx2.start(), 0);
         assert_eq!(fx2.end(), 0);
         assert_eq!(fx2.name(), Some("fx2"));
+    }
+
+    #[test]
+    fn with_coords() {
+        let fx = Feature::default()
+            .with_coords(1, 3);
+        assert_eq!(fx.start(), 1);
+        assert_eq!(fx.end(), 3);
+        assert_eq!(fx.name(), None);
+    }
+
+    #[test]
+    fn with_multiples() {
+        let fx = Feature::default()
+            .with_name("fx")
+            .with_coords(20, 30);
+        assert_eq!(fx.start(), 20);
+        assert_eq!(fx.end(), 30);
+        assert_eq!(fx.name(), Some("fx"));
     }
 }
 
