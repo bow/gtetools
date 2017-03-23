@@ -214,6 +214,21 @@ mod test_feature {
         assert_eq!(fx.end(), 0);
         assert!(fx.validate().is_ok());
     }
+
+    #[test]
+    fn with_name() {
+        let fx1 = Feature::default()
+            .with_name("fx1");
+        assert_eq!(fx1.start(), 0);
+        assert_eq!(fx1.end(), 0);
+        assert_eq!(fx1.name(), Some("fx1"));
+
+        let fx2 = Feature::default()
+            .with_name("fx2".to_owned());
+        assert_eq!(fx2.start(), 0);
+        assert_eq!(fx2.end(), 0);
+        assert_eq!(fx2.name(), Some("fx2"));
+    }
 }
 
 /// Gene annotation.
@@ -333,20 +348,5 @@ mod test_exon {
         assert_eq!(exon.start(), 0);
         assert_eq!(exon.end(), 0);
         assert_eq!(exon.name(), None);
-    }
-
-    #[test]
-    fn with_name() {
-        let exon1 = Feature::exon()
-            .with_name("ex1");
-        assert_eq!(exon1.start(), 0);
-        assert_eq!(exon1.end(), 0);
-        assert_eq!(exon1.name(), Some("ex1"));
-
-        let exon2 = Feature::exon()
-            .with_name("ex2".to_owned());
-        assert_eq!(exon2.start(), 0);
-        assert_eq!(exon2.end(), 0);
-        assert_eq!(exon2.name(), Some("ex2"));
     }
 }
