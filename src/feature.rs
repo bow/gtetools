@@ -49,8 +49,18 @@ pub trait Interval: Sized {
     /// End coordinate of the interval.
     fn end(&self) -> u64;
 
+    /// Name of the interval.
+    fn name(&self) -> Option<&str>;
+
+    /// Name setter that returns the struct itself.
+    ///
+    /// This function is expected to mutate the implementing struct.
+    fn with_name<T: Into<String>>(self, name: T) -> Self;
+
     /// Performs various validation of the interval.
-    fn validate(self) -> Result<Self, FeatureError>;
+    fn validate(self) -> Result<Self, FeatureError> {
+        self.validate_coords()
+    }
 
     /// The number of bases covered by the interval.
     fn span(&self) -> u64 {
@@ -86,6 +96,37 @@ pub trait Interval: Sized {
     }
 }
 
+/// Macro for default function implementations of interval types.
+macro_rules! impl_interval {
+    ($struct_ty:ty) => (
+
+        impl Interval for $struct_ty {
+
+            /// Name of the interval.
+            fn name(&self) -> Option<&str> {
+                self.name.as_ref().map(|n| n.as_str())
+            }
+
+            /// Start coordinate of the interval.
+            fn start(&self) -> u64 {
+                self.start
+            }
+
+            /// End coordinate of the interval.
+            fn end(&self) -> u64 {
+                self.end
+            }
+
+            fn with_name<T>(mut self, name: T) -> $struct_ty
+                where T: Into<String>
+            {
+                self.name = Some(name.into());
+                self
+            }
+        }
+
+    );
+}
 
 /// Default implementation of the `Interval` trait.
 ///
@@ -94,6 +135,7 @@ pub trait Interval: Sized {
 pub struct Feature {
     start: u64,
     end: u64,
+    name: Option<String>,
 }
 
 impl Feature {
@@ -151,22 +193,15 @@ impl Feature {
     pub fn exon() -> Exon {
         Exon::default()
     }
-}
 
-impl Interval for Feature {
-
-    fn start(&self) -> u64 {
-        self.start
-    }
-
-    fn end(&self) -> u64 {
-        self.end
-    }
-
-    fn validate(self) -> Result<Feature, FeatureError> {
-        self.validate_coords()
+    pub fn with_coords(mut self, start: u64, end: u64) -> Feature {
+        self.start = start;
+        self.end = end;
+        self
     }
 }
+
+impl_interval!(Feature);
 
 #[cfg(test)]
 mod test_feature {
@@ -192,29 +227,12 @@ pub struct Gene {
 
 impl Gene {
 
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| n.as_str())
-    }
-
     pub fn transcripts(&self) -> &HashMap<String, Transcript> {
         &self.transcripts
     }
 }
 
-impl Interval for Gene {
-
-    fn start(&self) -> u64 {
-        self.start
-    }
-
-    fn end(&self) -> u64 {
-        self.end
-    }
-
-    fn validate(self) -> Result<Gene, FeatureError> {
-        self.validate_coords()
-    }
-}
+impl_interval!(Gene);
 
 #[cfg(test)]
 mod test_gene {
@@ -259,10 +277,6 @@ impl Default for Transcript {
 
 impl Transcript {
 
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| n.as_str())
-    }
-
     pub fn strand(&self) -> &Strand {
         &self.strand
     }
@@ -280,20 +294,7 @@ impl Transcript {
     }
 }
 
-impl Interval for Transcript {
-
-    fn start(&self) -> u64 {
-        self.start
-    }
-
-    fn end(&self) -> u64 {
-        self.end
-    }
-
-    fn validate(self) -> Result<Transcript, FeatureError> {
-        self.validate_coords()
-    }
-}
+impl_interval!(Transcript);
 
 #[cfg(test)]
 mod test_transcript {
@@ -320,34 +321,7 @@ pub struct Exon {
     end: u64,
 }
 
-impl Exon {
-
-    pub fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|n| n.as_str())
-    }
-
-    pub fn with_name<T>(mut self, n: T) -> Exon
-        where T: Into<String>
-    {
-        self.name = Some(n.into());
-        self
-    }
-}
-
-impl Interval for Exon {
-
-    fn start(&self) -> u64 {
-        self.start
-    }
-
-    fn end(&self) -> u64 {
-        self.end
-    }
-
-    fn validate(self) -> Result<Exon, FeatureError> {
-        self.validate_coords()
-    }
-}
+impl_interval!(Exon);
 
 #[cfg(test)]
 mod test_exon {
@@ -363,12 +337,14 @@ mod test_exon {
 
     #[test]
     fn with_name() {
-        let exon1 = Feature::exon().with_name("ex1");
+        let exon1 = Feature::exon()
+            .with_name("ex1");
         assert_eq!(exon1.start(), 0);
         assert_eq!(exon1.end(), 0);
         assert_eq!(exon1.name(), Some("ex1"));
 
-        let exon2 = Feature::exon().with_name("ex2".to_owned());
+        let exon2 = Feature::exon()
+            .with_name("ex2".to_owned());
         assert_eq!(exon2.start(), 0);
         assert_eq!(exon2.end(), 0);
         assert_eq!(exon2.name(), Some("ex2"));
