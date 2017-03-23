@@ -337,6 +337,15 @@ impl Transcript {
     pub fn exons(&self) -> &Vec<Exon> {
         &self.exons
     }
+
+    pub fn with_exons(mut self, exons: Vec<Exon>) -> Transcript {
+        self.exons = exons;
+        self
+    }
+
+    pub fn insert_exon(&mut self, exon: Exon) {
+        self.exons.push(exon);
+    }
 }
 
 impl Default for Transcript {
@@ -392,6 +401,25 @@ mod test_transcript {
             .with_cds_end(40);
         assert_eq!(trx.cds_end(), Some(40))
     }
+
+    #[test]
+    fn with_exons() {
+        let trx = Feature::transcript()
+            .with_exons(vec![
+                Exon::new(1, 2, Some("ex1")),
+                Exon::new(10, 20, Some("ex2")),
+                Exon::new(100, 200, Some("ex3")),
+            ]);
+        assert_eq!(trx.exons().len(), 3);
+    }
+
+    #[test]
+    fn insert_exon() {
+        let mut trx = Feature::transcript();
+        assert_eq!(trx.exons().len(), 0);
+        trx.insert_exon(Exon::new(1, 2, Some("ex")));
+        assert_eq!(trx.exons().len(), 1);
+    }
 }
 
 /// Exon annotation.
@@ -400,6 +428,16 @@ pub struct Exon {
     name: Option<String>,
     start: u64,
     end: u64,
+}
+
+impl Exon {
+
+    fn new<T>(start: u64, end: u64, name: Option<T>) -> Exon
+        where T: Into<String>
+    {
+        Exon { start: start, end: end,
+               name: name.map(|n| n.into()) }
+    }
 }
 
 impl_interval!(Exon);
