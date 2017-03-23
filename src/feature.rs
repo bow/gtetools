@@ -204,12 +204,6 @@ impl Feature {
     pub fn exon() -> Exon {
         Exon::default()
     }
-
-    pub fn with_coords(mut self, start: u64, end: u64) -> Feature {
-        self.start = start;
-        self.end = end;
-        self
-    }
 }
 
 impl_interval!(Feature);
