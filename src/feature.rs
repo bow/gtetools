@@ -47,7 +47,7 @@ pub trait NamedInterval: Sized {
     }
 
     /// Whether two intervals cover a contiguous region without any overlaps.
-    fn adjacent(&self, other: &Self) -> bool {
+    fn is_adjacent(&self, other: &Self) -> bool {
         self.end() == other.start() || self.start() == other.end()
     }
 }
@@ -190,5 +190,63 @@ mod test_feature {
         let fx5 = make_feature(200, 300);
         assert!(!fx1.overlaps(&fx5));
         assert!(!fx5.overlaps(&fx1));
+    }
+
+    #[test]
+    fn envelops() {
+        let fx1 = make_feature(100, 120);
+
+        let fx2 = make_feature(105, 115);
+        assert!(fx1.envelops(&fx2));
+        assert!(!fx2.envelops(&fx1));
+
+        let fx3 = make_feature(100, 105);
+        assert!(fx1.envelops(&fx3));
+        assert!(!fx3.envelops(&fx1));
+
+        let fx4 = make_feature(115, 120);
+        assert!(fx1.envelops(&fx4));
+        assert!(!fx4.envelops(&fx1));
+
+        let fx5 = make_feature(90, 105);
+        assert!(!fx1.envelops(&fx5));
+        assert!(!fx5.envelops(&fx1));
+
+        let fx6 = make_feature(115, 130);
+        assert!(!fx1.envelops(&fx5));
+        assert!(!fx6.envelops(&fx1));
+
+        let fx7 = make_feature(80, 90);
+        assert!(!fx1.envelops(&fx7));
+        assert!(!fx7.envelops(&fx1));
+    }
+
+    #[test]
+    fn is_adjacent() {
+        let fx1 = make_feature(100, 120);
+
+        let fx2 = make_feature(90, 100);
+        assert!(fx1.is_adjacent(&fx2));
+        assert!(fx2.is_adjacent(&fx1));
+
+        let fx3 = make_feature(120, 130);
+        assert!(fx1.is_adjacent(&fx3));
+        assert!(fx3.is_adjacent(&fx1));
+
+        let fx4 = make_feature(90, 99);
+        assert!(!fx1.is_adjacent(&fx4));
+        assert!(!fx4.is_adjacent(&fx1));
+
+        let fx5 = make_feature(119, 130);
+        assert!(!fx1.is_adjacent(&fx5));
+        assert!(!fx5.is_adjacent(&fx1));
+
+        let fx6 = make_feature(100, 110);
+        assert!(!fx1.is_adjacent(&fx6));
+        assert!(!fx6.is_adjacent(&fx1));
+
+        let fx7 = make_feature(110, 120);
+        assert!(!fx1.is_adjacent(&fx7));
+        assert!(!fx7.is_adjacent(&fx1));
     }
 }
