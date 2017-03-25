@@ -1,5 +1,8 @@
 //! Interval-based annotation features.
 
+use std::collections::HashMap;
+
+use bio::io::Strand;
 use bio::utils::{Interval, IntervalError};
 
 
@@ -102,7 +105,177 @@ impl Default for Feature {
     }
 }
 
+impl Feature {
+
+    /// Creates a gene interval with default values.
+    ///
+    /// A gene interval is a container for transcript intervals.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let gene = Feature::gene();
+    ///
+    /// assert_eq!(gene.transcript().len(), 0);
+    /// assert_eq!(gene.start(), 0);
+    /// assert_eq!(gene.end(), 0);
+    /// assert_eq!(gene.name(), None);
+    /// ```
+    pub fn gene() -> Gene {
+        Gene::default()
+    }
+
+    /// Creates a transcript interval with default values.
+    ///
+    /// A transcript interval is a container for exon intervals.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use bio::io::Strand;
+    ///
+    /// let transcript = Feature::transcript();
+    ///
+    /// assert_eq!(transcript.exons().len(), 0);
+    /// assert_eq!(transcript.strand(), &Strand::Unknown)
+    /// assert_eq!(transcript.start(), 0);
+    /// assert_eq!(transcript.end(), 0);
+    /// assert_eq!(transcript.name(), None);
+    /// ```
+    pub fn transcript() -> Transcript {
+        Transcript::default()
+    }
+
+    /// Creates an exon interval with default values.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let exon = Feature::exon();
+    ///
+    /// assert_eq!(exon.start(), 0);
+    /// assert_eq!(exon.end(), 0);
+    /// assert_eq!(exon.name(), None);
+    /// ```
+    pub fn exon() -> Exon {
+        Exon::default()
+    }
+}
+
 impl_ninterval!(Feature);
+
+/// Exon annotation.
+#[derive(Debug)]
+pub struct Exon {
+    interval: Interval<u64>,
+    name: Option<String>,
+}
+
+impl Default for Exon {
+
+    fn default() -> Exon {
+        Exon { interval: Interval::new(0..0).unwrap(), name: None }
+    }
+}
+
+impl_ninterval!(Exon);
+
+/// Transcript annotation.
+#[derive(Debug)]
+pub struct Transcript {
+    interval: Interval<u64>,
+    name: Option<String>,
+    strand: Strand,
+    cds_start: Option<u64>,
+    cds_end: Option<u64>,
+    exons: Vec<Exon>,
+}
+
+impl Default for Transcript {
+
+    fn default() -> Transcript {
+        Transcript {
+            interval: Interval::new(0..0).unwrap(),
+            name: None,
+            strand: Strand::Unknown,
+            cds_start: None,
+            cds_end: None,
+            exons: Vec::new(),
+        }
+    }
+}
+
+impl_ninterval!(Transcript);
+
+impl Transcript {
+
+    pub fn strand(&self) -> &Strand {
+        &self.strand
+    }
+
+    pub fn with_strand(mut self, strand: Strand) -> Transcript {
+        self.strand = strand;
+        self
+    }
+
+    pub fn cds_start(&self) -> Option<u64> {
+        self.cds_start
+    }
+
+    pub fn with_cds_start(mut self, cds_start: u64) -> Transcript {
+        self.cds_start = Some(cds_start);
+        self
+    }
+
+    pub fn cds_end(&self) -> Option<u64> {
+        self.cds_end
+    }
+
+    pub fn with_cds_end(mut self, cds_end: u64) -> Transcript {
+        self.cds_end = Some(cds_end);
+        self
+    }
+
+    pub fn exons(&self) -> &Vec<Exon> {
+        &self.exons
+    }
+
+    pub fn with_exons(mut self, exons: Vec<Exon>) -> Transcript {
+        self.exons = exons;
+        self
+    }
+
+    pub fn insert_exon(&mut self, exon: Exon) {
+        self.exons.push(exon);
+    }
+}
+
+/// Gene annotation.
+#[derive(Debug)]
+pub struct Gene {
+    interval: Interval<u64>,
+    name: Option<String>,
+    transcripts: HashMap<String, Transcript>,
+}
+
+impl Default for Gene {
+
+    fn default() -> Gene {
+        Gene { interval: Interval::new(0..0).unwrap(),
+               name: None,
+               transcripts: HashMap::new(),
+        }
+    }
+}
+
+impl_ninterval!(Gene);
+
+impl Gene {
+
+    pub fn transcripts(&self) -> &HashMap<String, Transcript> {
+        &self.transcripts
+    }
+}
 
 #[cfg(test)]
 mod test_feature {
@@ -248,5 +421,95 @@ mod test_feature {
         let fx7 = make_feature(110, 120);
         assert!(!fx1.is_adjacent(&fx7));
         assert!(!fx7.is_adjacent(&fx1));
+    }
+}
+
+#[cfg(test)]
+mod test_exon {
+    use super::*;
+
+    #[test]
+    fn default() {
+        let exon = Feature::exon();
+        assert_eq!(exon.start(), 0);
+        assert_eq!(exon.end(), 0);
+        assert_eq!(exon.name(), None);
+    }
+}
+
+#[cfg(test)]
+mod test_transcript {
+    use super::*;
+
+    #[test]
+    fn default() {
+        let trx = Feature::transcript();
+        assert_eq!(trx.start(), 0);
+        assert_eq!(trx.end(), 0);
+        assert_eq!(trx.name(), None);
+        assert_eq!(trx.strand(), &Strand::Unknown);
+        assert_eq!(trx.cds_start(), None);
+        assert_eq!(trx.cds_end(), None);
+        assert_eq!(trx.exons().len(), 0);
+    }
+
+    #[test]
+    fn with_strand() {
+        let trx = Feature::transcript()
+            .with_strand(Strand::Forward);
+        assert_eq!(trx.strand(), &Strand::Forward);
+    }
+
+    #[test]
+    fn with_cds_start() {
+        let trx = Feature::transcript()
+            .with_cds_start(20);
+        assert_eq!(trx.cds_start(), Some(20));
+    }
+
+    #[test]
+    fn with_cds_end() {
+        let trx = Feature::transcript()
+            .with_cds_end(40);
+        assert_eq!(trx.cds_end(), Some(40))
+    }
+
+    fn make_exon<T: Into<String>>(start: u64, end: u64, name: T) -> Exon {
+        Feature::exon()
+            .with_name(name)
+            .with_coords(start, end).unwrap()
+    }
+
+    #[test]
+    fn with_exons() {
+        let trx = Feature::transcript()
+            .with_exons(vec![
+                make_exon(1, 2, "ex1"),
+                make_exon(10, 20, "ex2"),
+                make_exon(100, 200, "ex3"),
+            ]);
+        assert_eq!(trx.exons().len(), 3);
+    }
+
+    #[test]
+    fn insert_exon() {
+        let mut trx = Feature::transcript();
+        assert_eq!(trx.exons().len(), 0);
+        trx.insert_exon(make_exon(1, 2, "ex"));
+        assert_eq!(trx.exons().len(), 1);
+    }
+}
+
+#[cfg(test)]
+mod test_gene {
+    use super::*;
+
+    #[test]
+    fn default() {
+        let gene = Feature::gene();
+        assert_eq!(gene.start(), 0);
+        assert_eq!(gene.end(), 0);
+        assert_eq!(gene.name(), None);
+        assert_eq!(gene.transcripts().len(), 0);
     }
 }
