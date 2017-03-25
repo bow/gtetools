@@ -161,29 +161,33 @@ mod test_feature {
         assert_eq!(fx.name(), Some("fx"));
     }
 
+    fn make_feature(start: u64, end: u64) -> Feature {
+        Feature::default().with_coords(start, end).unwrap()
+    }
+
     #[test]
     fn span() {
-        let fx = Feature::default().with_coords(0, 15).unwrap();
+        let fx = make_feature(0, 15);
         assert_eq!(fx.span(), 15);
     }
 
     #[test]
     fn overlaps() {
-        let fx1 = Feature::default().with_coords(100, 115).unwrap();
+        let fx1 = make_feature(100, 115);
 
-        let fx2 = Feature::default().with_coords(110, 120).unwrap();
+        let fx2 = make_feature(110, 120);
         assert!(fx1.overlaps(&fx2));
         assert!(fx1.overlaps(&fx2));
 
-        let fx3 = Feature::default().with_coords(115, 120).unwrap();
+        let fx3 = make_feature(115, 120);
         assert!(!fx1.overlaps(&fx3));
         assert!(!fx3.overlaps(&fx1));
 
-        let fx4 = Feature::default().with_coords(90, 100).unwrap();
+        let fx4 = make_feature(90, 100);
         assert!(!fx1.overlaps(&fx4));
         assert!(!fx4.overlaps(&fx1));
 
-        let fx5 = Feature::default().with_coords(200, 300).unwrap();
+        let fx5 = make_feature(200, 300);
         assert!(!fx1.overlaps(&fx5));
         assert!(!fx5.overlaps(&fx1));
     }
