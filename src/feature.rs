@@ -1,7 +1,9 @@
 //! Interval-based annotation features.
 
 use std::collections::HashMap;
+use std::iter::FromIterator;
 
+use bio::data_structures::interval_tree::{IntervalTree, IntervalTreeIterator};
 use bio::io::Strand;
 use bio::utils::{Interval, IntervalError};
 
@@ -188,7 +190,7 @@ pub struct Transcript {
     strand: Strand,
     cds_start: Option<u64>,
     cds_end: Option<u64>,
-    exons: Vec<Exon>,
+    exons: IntervalTree<u64, Exon>,
 }
 
 impl Default for Transcript {
@@ -200,7 +202,7 @@ impl Default for Transcript {
             strand: Strand::Unknown,
             cds_start: None,
             cds_end: None,
-            exons: Vec::new(),
+            exons: IntervalTree::new(),
         }
     }
 }
@@ -216,6 +218,23 @@ impl Transcript {
     pub fn with_strand(mut self, strand: Strand) -> Transcript {
         self.strand = strand;
         self
+    }
+
+    pub fn exons(&self) -> &IntervalTree<u64, Exon> {
+        &self.exons
+    }
+
+    pub fn with_exons<I>(mut self, exons: I) -> Transcript
+        where I: IntoIterator<Item=Exon>
+    {
+        let exp_iter = exons.into_iter()
+            .map(|exn| (exn.interval.clone(), exn));
+        self.exons = IntervalTree::from_iter(exp_iter);
+        self
+    }
+
+    pub fn insert_exon(&mut self, exon: Exon) {
+        self.exons.insert(exon.start()..exon.end(), exon);
     }
 
     pub fn cds_start(&self) -> Option<u64> {
@@ -236,17 +255,14 @@ impl Transcript {
         self
     }
 
-    pub fn exons(&self) -> &Vec<Exon> {
-        &self.exons
+    pub fn iter(&self) -> IntervalTreeIterator<u64, Exon> {
+        // FIXME: iteration over IntervalTree items instead of using (min, max) hack.
+        self.exons.find(0..u64::max_value())
     }
 
-    pub fn with_exons(mut self, exons: Vec<Exon>) -> Transcript {
-        self.exons = exons;
-        self
-    }
-
-    pub fn insert_exon(&mut self, exon: Exon) {
-        self.exons.push(exon);
+    /// Returns the number of exons in the trancripts in O(n) time.
+    pub fn len(&self) -> usize {
+        self.iter().map(|_exon| 1).fold(0, |acc, x| acc + x)
     }
 }
 
@@ -450,7 +466,7 @@ mod test_transcript {
         assert_eq!(trx.strand(), &Strand::Unknown);
         assert_eq!(trx.cds_start(), None);
         assert_eq!(trx.cds_end(), None);
-        assert_eq!(trx.exons().len(), 0);
+        assert_eq!(trx.len(), 0);
     }
 
     #[test]
@@ -488,15 +504,15 @@ mod test_transcript {
                 make_exon(10, 20, "ex2"),
                 make_exon(100, 200, "ex3"),
             ]);
-        assert_eq!(trx.exons().len(), 3);
+        assert_eq!(trx.len(), 3);
     }
 
     #[test]
     fn insert_exon() {
         let mut trx = Feature::transcript();
-        assert_eq!(trx.exons().len(), 0);
+        assert_eq!(trx.len(), 0);
         trx.insert_exon(make_exon(1, 2, "ex"));
-        assert_eq!(trx.exons().len(), 1);
+        assert_eq!(trx.len(), 1);
     }
 }
 
