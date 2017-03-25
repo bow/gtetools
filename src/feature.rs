@@ -6,7 +6,7 @@ use bio::utils::{Interval, IntervalError};
 pub trait NamedInterval: Sized {
 
     /// Underlying interval struct.
-    fn interval(&self) -> &Interval<u64>;
+    fn interval(&self) -> &Interval<u64>;  // TODO: Generalize over interval types.
 
     /// Name of the interval.
     fn name(&self) -> Option<&str>;
@@ -36,10 +36,9 @@ pub trait NamedInterval: Sized {
         self.end() - self.start()
     }
 
-    /// Whether two intervals have an intersection or not.
+    /// Whether two intervals have an overlap or not.
     fn overlaps(&self, other: &Self) -> bool {
-        (other.start() <= self.start() && self.start() <= other.end()) ||
-        (other.start() <= self.end() && self.end() <= other.end())
+        self.start() < other.end() && other.start() < self.end()
     }
 
     /// Whether one interval completely contains the other.
@@ -160,5 +159,32 @@ mod test_feature {
         assert_eq!(fx.start(), 20);
         assert_eq!(fx.end(), 30);
         assert_eq!(fx.name(), Some("fx"));
+    }
+
+    #[test]
+    fn span() {
+        let fx = Feature::default().with_coords(0, 15).unwrap();
+        assert_eq!(fx.span(), 15);
+    }
+
+    #[test]
+    fn overlaps() {
+        let fx1 = Feature::default().with_coords(100, 115).unwrap();
+
+        let fx2 = Feature::default().with_coords(110, 120).unwrap();
+        assert!(fx1.overlaps(&fx2));
+        assert!(fx1.overlaps(&fx2));
+
+        let fx3 = Feature::default().with_coords(115, 120).unwrap();
+        assert!(!fx1.overlaps(&fx3));
+        assert!(!fx3.overlaps(&fx1));
+
+        let fx4 = Feature::default().with_coords(90, 100).unwrap();
+        assert!(!fx1.overlaps(&fx4));
+        assert!(!fx4.overlaps(&fx1));
+
+        let fx5 = Feature::default().with_coords(200, 300).unwrap();
+        assert!(!fx1.overlaps(&fx5));
+        assert!(!fx5.overlaps(&fx1));
     }
 }
