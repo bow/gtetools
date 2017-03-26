@@ -188,8 +188,7 @@ pub struct Transcript {
     interval: Interval<u64>,
     name: Option<String>,
     strand: Strand,
-    cds_start: Option<u64>,
-    cds_end: Option<u64>,
+    cds: Option<Feature>,
     exons: IntervalTree<u64, Exon>,
 }
 
@@ -200,8 +199,7 @@ impl Default for Transcript {
             interval: Interval::new(0..0).unwrap(),
             name: None,
             strand: Strand::Unknown,
-            cds_start: None,
-            cds_end: None,
+            cds: None,
             exons: IntervalTree::new(),
         }
     }
@@ -237,21 +235,12 @@ impl Transcript {
         self.exons.insert(exon.start()..exon.end(), exon);
     }
 
-    pub fn cds_start(&self) -> Option<u64> {
-        self.cds_start
+    pub fn cds(&self) -> Option<&Feature> {
+        self.cds.as_ref()
     }
 
-    pub fn with_cds_start(mut self, cds_start: u64) -> Transcript {
-        self.cds_start = Some(cds_start);
-        self
-    }
-
-    pub fn cds_end(&self) -> Option<u64> {
-        self.cds_end
-    }
-
-    pub fn with_cds_end(mut self, cds_end: u64) -> Transcript {
-        self.cds_end = Some(cds_end);
+    pub fn with_cds(mut self, cds: Feature) -> Transcript {
+        self.cds = Some(cds);
         self
     }
 
@@ -464,8 +453,7 @@ mod test_transcript {
         assert_eq!(trx.end(), 0);
         assert_eq!(trx.name(), None);
         assert_eq!(trx.strand(), &Strand::Unknown);
-        assert_eq!(trx.cds_start(), None);
-        assert_eq!(trx.cds_end(), None);
+        assert!(trx.cds().is_none());
         assert_eq!(trx.len(), 0);
     }
 
@@ -474,20 +462,6 @@ mod test_transcript {
         let trx = Feature::transcript()
             .with_strand(Strand::Forward);
         assert_eq!(trx.strand(), &Strand::Forward);
-    }
-
-    #[test]
-    fn with_cds_start() {
-        let trx = Feature::transcript()
-            .with_cds_start(20);
-        assert_eq!(trx.cds_start(), Some(20));
-    }
-
-    #[test]
-    fn with_cds_end() {
-        let trx = Feature::transcript()
-            .with_cds_end(40);
-        assert_eq!(trx.cds_end(), Some(40))
     }
 
     fn make_exon<T: Into<String>>(start: u64, end: u64, name: T) -> Exon {
