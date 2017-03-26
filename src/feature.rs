@@ -121,7 +121,7 @@ impl Feature {
     /// assert_eq!(gene.transcript().len(), 0);
     /// assert_eq!(gene.start(), 0);
     /// assert_eq!(gene.end(), 0);
-    /// assert_eq!(gene.name(), None);
+    /// assert!(gene.name().is_none());
     /// ```
     pub fn gene() -> Gene {
         Gene::default()
@@ -142,7 +142,7 @@ impl Feature {
     /// assert_eq!(transcript.strand(), &Strand::Unknown)
     /// assert_eq!(transcript.start(), 0);
     /// assert_eq!(transcript.end(), 0);
-    /// assert_eq!(transcript.name(), None);
+    /// assert!(transcript.name().is_none());
     /// ```
     pub fn transcript() -> Transcript {
         Transcript::default()
@@ -157,7 +157,7 @@ impl Feature {
     ///
     /// assert_eq!(exon.start(), 0);
     /// assert_eq!(exon.end(), 0);
-    /// assert_eq!(exon.name(), None);
+    /// assert!(exon.name().is_none());
     /// ```
     pub fn exon() -> Exon {
         Exon::default()
@@ -291,7 +291,7 @@ mod test_feature {
         let fx = Feature::default();
         assert_eq!(fx.start(), 0);
         assert_eq!(fx.end(), 0);
-        assert_eq!(fx.name(), None);
+        assert!(fx.name().is_none());
     }
 
     #[test]
@@ -317,7 +317,7 @@ mod test_feature {
         let fx = fxm.unwrap();
         assert_eq!(fx.start(), 1);
         assert_eq!(fx.end(), 3);
-        assert_eq!(fx.name(), None);
+        assert!(fx.name().is_none());
     }
 
     #[test]
@@ -438,7 +438,7 @@ mod test_exon {
         let exon = Feature::exon();
         assert_eq!(exon.start(), 0);
         assert_eq!(exon.end(), 0);
-        assert_eq!(exon.name(), None);
+        assert!(exon.name().is_none());
     }
 }
 
@@ -451,7 +451,7 @@ mod test_transcript {
         let trx = Feature::transcript();
         assert_eq!(trx.start(), 0);
         assert_eq!(trx.end(), 0);
-        assert_eq!(trx.name(), None);
+        assert!(trx.name().is_none());
         assert_eq!(trx.strand(), &Strand::Unknown);
         assert!(trx.cds().is_none());
         assert_eq!(trx.len(), 0);
@@ -499,7 +499,7 @@ mod test_gene {
         let gene = Feature::gene();
         assert_eq!(gene.start(), 0);
         assert_eq!(gene.end(), 0);
-        assert_eq!(gene.name(), None);
+        assert!(gene.name().is_none());
         assert_eq!(gene.transcripts().len(), 0);
     }
 }
