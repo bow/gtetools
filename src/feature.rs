@@ -18,6 +18,8 @@ pub mod error {
     pub enum FeatureError {
         IntervalError,
         StrandCharError,
+        ConflictingStrandError,
+        UnspecifiedStrandError,
     }
 
     impl Error for FeatureError {
@@ -26,6 +28,8 @@ pub mod error {
             match *self {
                 FeatureError::IntervalError => "interval start coordinate larger than its end coordinate",
                 FeatureError::StrandCharError => "strand character is invalid",
+                FeatureError::ConflictingStrandError => "conflicting strand inputs specified",
+                FeatureError::UnspecifiedStrandError => "strand not specified",
             }
         }
 
@@ -79,6 +83,39 @@ macro_rules! impl_annotation {
     );
 }
 
+fn char_to_strand(strand_char: char) -> Result<Strand, FeatureError> {
+    match strand_char {
+        '+' | 'f' | 'F' => Ok(Strand::Forward),
+        '-' | 'r' | 'R' => Ok(Strand::Reverse),
+        '.' | '?' => Ok(Strand::Unknown),
+        _ => Err(FeatureError::StrandCharError),
+    }
+}
+
+fn resolve_strand_input(strand: Option<Strand>, strand_char: Option<char>) -> Result<Strand, FeatureError> {
+    match (strand, strand_char) {
+        (None, None) => Err(FeatureError::UnspecifiedStrandError),
+        (Some(sv), None) => Ok(sv),
+        (None, Some(scv)) => char_to_strand(scv),
+        (Some(sv), Some(scv)) => {
+            let sv_from_char = char_to_strand(scv)?;
+            if sv == sv_from_char {
+                Ok(sv)
+            } else {
+                Err(FeatureError::ConflictingStrandError)
+            }
+        }
+    }
+}
+
+fn coords_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
+    Interval::new(start..end)
+        .map_err(|err| match err {
+            IntervalError::InvalidRange => FeatureError::IntervalError
+        })
+}
+
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TxFeature {
     Exon,
@@ -113,10 +150,10 @@ pub struct TxFeatureBuilder {
     seq_name: String,
     start: u64,
     end: u64,
-    strand: Strand,
-    strand_char: Option<char>,
     attributes: HashMap<String, String>,
     kind: TxFeature,
+    strand: Option<Strand>,
+    strand_char: Option<char>,
 }
 
 impl TxFeatureBuilder {
@@ -128,8 +165,8 @@ impl TxFeatureBuilder {
             seq_name: seq_name.into(),
             start: start, end: end,
             kind: TxFeature::Any,
-            strand: Strand::Unknown,
             attributes: HashMap::new(),
+            strand: None,
             strand_char: None,
         }
     }
@@ -140,7 +177,7 @@ impl TxFeatureBuilder {
     }
 
     fn strand(mut self, strand: Strand) -> TxFeatureBuilder {
-        self.strand = strand;
+        self.strand = Some(strand);
         self
     }
 
@@ -157,20 +194,8 @@ impl TxFeatureBuilder {
     }
 
     fn build(self) -> Result<TranscriptFeature, FeatureError> {
-        let interval = Interval::new(self.start..self.end)
-            .map_err(|err| match err {
-                IntervalError::InvalidRange => FeatureError::IntervalError
-            })?;
-
-        let strand = match self.strand_char {
-            None => Ok(self.strand),
-            Some('+') | Some('f') => Ok(Strand::Forward),
-            Some('-') | Some('r') => Ok(Strand::Reverse),
-            Some('.') | Some('?') => Ok(Strand::Unknown),
-            _         => Err(FeatureError::StrandCharError),
-        }?;
-
-
+        let interval = coords_to_interval(self.start, self.end)?;
+        let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let feature = TranscriptFeature {
             seq_name: self.seq_name, kind: self.kind, interval: interval,
             strand: strand, attributes: self.attributes,
@@ -222,34 +247,44 @@ mod test_transcript_feature {
         assert_eq!(tf.attributes.len(), 1);
 
         let tfm2 = TxFeatureBuilder::new("chrO", 10, 10)
+            .strand_char('-')
+            .strand(Strand::Reverse)
             .build();
         assert!(tfm2.is_ok());
     }
 
     #[test]
-    fn test_builder_strand_char() {
-        let tfm = TxFeatureBuilder::new("chrT", 20, 30)
-            .strand(Strand::Forward)
-            .strand_char('-')
-            .build();
-        assert!(tfm.is_ok());
-        let tf = tfm.unwrap();
-        assert_eq!(tf.strand(), &Strand::Reverse);
-    }
-
-    #[test]
-    fn test_builder_interval_err() {
+    fn test_builder_interval_invalid() {
         let tfm = TxFeatureBuilder::new("chrE", 20, 10).build();
         assert!(tfm.is_err());
         assert_eq!(tfm.unwrap_err(), FeatureError::IntervalError);
     }
 
     #[test]
-    fn test_build_strand_char_err() {
+    fn test_builder_strand_unspecified() {
+        let tfm = TxFeatureBuilder::new("chrT", 20, 30)
+            .build();
+        assert!(tfm.is_err());
+        assert_eq!(tfm.unwrap_err(), FeatureError::UnspecifiedStrandError);
+    }
+
+    #[test]
+    fn test_build_strand_char_unexpected() {
         let tfm = TxFeatureBuilder::new("chrE", 10, 20)
             .strand_char('w')
             .build();
         assert!(tfm.is_err());
         assert_eq!(tfm.unwrap_err(), FeatureError::StrandCharError);
+    }
+
+    #[test]
+    fn test_build_strand_char_conflicting() {
+        let tfm = TxFeatureBuilder::new("chrE", 10, 20)
+            .strand_char('-')
+            .strand(Strand::Reverse)
+            .build();
+        assert!(tfm.is_ok());
+        let tf = tfm.unwrap();
+        assert_eq!(tf.strand(), &Strand::Reverse);
     }
 }
