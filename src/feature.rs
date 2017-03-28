@@ -232,7 +232,7 @@ mod test_transcript_feature {
     use super::*;
 
     #[test]
-    fn test_builder() {
+    fn builder() {
         let tfm1 = TxFeatureBuilder::new("chrT", 10, 20)
             .kind(TxFeature::Exon)
             .strand(Strand::Forward)
@@ -254,14 +254,14 @@ mod test_transcript_feature {
     }
 
     #[test]
-    fn test_builder_interval_invalid() {
+    fn builder_interval_invalid() {
         let tfm = TxFeatureBuilder::new("chrE", 20, 10).build();
         assert!(tfm.is_err());
         assert_eq!(tfm.unwrap_err(), FeatureError::IntervalError);
     }
 
     #[test]
-    fn test_builder_strand_unspecified() {
+    fn builder_strand_unspecified() {
         let tfm = TxFeatureBuilder::new("chrT", 20, 30)
             .build();
         assert!(tfm.is_err());
@@ -269,7 +269,7 @@ mod test_transcript_feature {
     }
 
     #[test]
-    fn test_build_strand_char_unexpected() {
+    fn builder_strand_char_unexpected() {
         let tfm = TxFeatureBuilder::new("chrE", 10, 20)
             .strand_char('w')
             .build();
@@ -278,7 +278,7 @@ mod test_transcript_feature {
     }
 
     #[test]
-    fn test_build_strand_char_conflicting() {
+    fn builder_strand_char_conflicting() {
         let tfm = TxFeatureBuilder::new("chrE", 10, 20)
             .strand_char('-')
             .strand(Strand::Reverse)
