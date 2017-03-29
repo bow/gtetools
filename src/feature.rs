@@ -28,16 +28,23 @@ pub mod error {
         StrandCharError,
         ConflictingStrandError,
         UnspecifiedStrandError,
+        IncompleteTranscriptError,
     }
 
     impl Error for FeatureError {
 
         fn description(&self) -> &str {
             match *self {
-                FeatureError::IntervalError => "interval start coordinate larger than its end coordinate",
-                FeatureError::StrandCharError => "strand character is invalid",
-                FeatureError::ConflictingStrandError => "conflicting strand inputs specified",
-                FeatureError::UnspecifiedStrandError => "strand not specified",
+                FeatureError::IntervalError =>
+                    "interval start coordinate larger than its end coordinate",
+                FeatureError::StrandCharError =>
+                    "strand character is invalid",
+                FeatureError::ConflictingStrandError =>
+                    "conflicting strand inputs specified",
+                FeatureError::UnspecifiedStrandError =>
+                    "strand not specified",
+                FeatureError::IncompleteTranscriptError =>
+                    "transcript annotation is incomplete",
             }
         }
 
