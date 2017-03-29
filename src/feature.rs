@@ -59,6 +59,12 @@ pub mod error {
             write!(f, "FeatureError: {}", self.description())
         }
     }
+
+    impl From<IntervalError> for FeatureError {
+        fn from(err: IntervalError) -> FeatureError {
+            FeatureError::IntervalError
+        }
+    }
 }
 
 trait Annotation {
@@ -124,10 +130,7 @@ fn resolve_strand_input(strand: Option<Strand>, strand_char: Option<char>) -> Re
 }
 
 fn coords_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
-    Interval::new(start..end)
-        .map_err(|err| match err {
-            IntervalError::InvalidRange => FeatureError::IntervalError
-        })
+    Interval::new(start..end).map_err(FeatureError::from)
 }
 
 
