@@ -4,18 +4,9 @@ use std::error::Error;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 
-use bio::utils::{Interval, IntervalError};
+use bio::utils::{Interval, IntervalError, Strand};
 
 use self::error::FeatureError;
-
-// TODO: PR for rust-bio so that it implements Copy
-//       for now, we use our own
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Strand {
-    Forward,
-    Reverse,
-    Unknown
-}
 
 
 pub mod error {
