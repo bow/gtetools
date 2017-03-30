@@ -5,8 +5,6 @@
 
 # Development Setup
 
-.. code-block:: bash
-
     # Clone the repository and cd into it
     $ git clone {repo-url}
     $ cd gfxtools
@@ -16,4 +14,3 @@
 
     # Run the test suite
     $ cargo test
-
