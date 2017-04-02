@@ -1,5 +1,5 @@
 [root]
-name = "gfxtools"
+name = "gnftools"
 version = "0.1.0"
 dependencies = [
  "bio 0.11.0 (git+https://github.com/rust-bio/rust-bio.git?rev=fbde62f)",
