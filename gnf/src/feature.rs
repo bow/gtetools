@@ -66,7 +66,7 @@ pub mod error {
     }
 }
 
-trait Annotation {
+pub trait Annotation {
     fn seq_name(&self) -> &str;
     fn interval(&self) -> &Interval<u64>;
     fn attributes(&self) -> &HashMap<String, String>;
@@ -191,7 +191,7 @@ mod test_transcript {
     }
 }
 
-fn infer_features(
+pub fn infer_features(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
@@ -351,7 +351,7 @@ impl_annotation!(TranscriptFeature);
 
 impl TranscriptFeature {
 
-    fn kind(&self) -> &TxFeature {
+    pub fn kind(&self) -> &TxFeature {
         &self.kind
     }
 }
@@ -368,7 +368,7 @@ pub struct TxFeatureBuilder {
 
 impl TxFeatureBuilder {
 
-    fn new<T>(seq_name: T, start: u64, end: u64) -> TxFeatureBuilder
+    pub fn new<T>(seq_name: T, start: u64, end: u64) -> TxFeatureBuilder
         where T: Into<String>
     {
         TxFeatureBuilder {
@@ -381,29 +381,29 @@ impl TxFeatureBuilder {
         }
     }
 
-    fn kind(mut self, kind: TxFeature) -> TxFeatureBuilder {
+    pub fn kind(mut self, kind: TxFeature) -> TxFeatureBuilder {
         self.kind = kind;
         self
     }
 
-    fn strand(mut self, strand: Strand) -> TxFeatureBuilder {
+    pub fn strand(mut self, strand: Strand) -> TxFeatureBuilder {
         self.strand = Some(strand);
         self
     }
 
-    fn strand_char(mut self, strand_char: char) -> TxFeatureBuilder {
+    pub fn strand_char(mut self, strand_char: char) -> TxFeatureBuilder {
         self.strand_char = Some(strand_char);
         self
     }
 
-    fn attribute<K, V>(mut self, key: K, value: V) -> TxFeatureBuilder
+    pub fn attribute<K, V>(mut self, key: K, value: V) -> TxFeatureBuilder
         where K: Into<String>, V: Into<String>
     {
         self.attributes.insert(key.into(), value.into());
         self
     }
 
-    fn build(self) -> Result<TranscriptFeature, FeatureError> {
+    pub fn build(self) -> Result<TranscriptFeature, FeatureError> {
         let interval = coords_to_interval(self.start, self.end)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let feature = TranscriptFeature {
@@ -427,7 +427,7 @@ impl_annotation!(Transcript);
 
 impl Transcript {
 
-    fn features(&self) -> &Vec<TranscriptFeature> {
+    pub fn features(&self) -> &Vec<TranscriptFeature> {
         &self.features
     }
 }
@@ -448,7 +448,7 @@ pub struct TranscriptBuilder {
 
 impl TranscriptBuilder {
 
-    fn new<T>(seq_name: T, start: u64, end: u64) -> TranscriptBuilder
+    pub fn new<T>(seq_name: T, start: u64, end: u64) -> TranscriptBuilder
         where T: Into<String>
     {
         TranscriptBuilder {
@@ -463,24 +463,28 @@ impl TranscriptBuilder {
         }
     }
 
-    fn strand(mut self, strand: Strand) -> TranscriptBuilder {
+    pub fn strand(mut self, strand: Strand) -> TranscriptBuilder {
         self.strand = Some(strand);
         self
     }
 
-    fn strand_char(mut self, strand_char: char) -> TranscriptBuilder {
+    pub fn strand_char(mut self, strand_char: char) -> TranscriptBuilder {
         self.strand_char = Some(strand_char);
         self
     }
 
-    fn attribute<K, V>(mut self, key: K, value: V) -> TranscriptBuilder
+    pub fn attribute<K, V>(mut self, key: K, value: V) -> TranscriptBuilder
         where K: Into<String>, V: Into<String>
     {
         self.attributes.insert(key.into(), value.into());
         self
     }
 
-    fn exon_and_cds_coords<E>(mut self, exon_coords: E, cds_coord: Option<(u64, u64)>)-> TranscriptBuilder
+    pub fn exon_and_cds_coords<E>(
+        mut self,
+        exon_coords: E,
+        cds_coord: Option<(u64, u64)>
+    )-> TranscriptBuilder
         where E: IntoIterator<Item=(u64, u64)>
     {
         self.exon_coords = Some(exon_coords.into_iter().collect());
@@ -488,7 +492,7 @@ impl TranscriptBuilder {
         self
     }
 
-    fn build(mut self) -> Result<Transcript, FeatureError> {
+    pub fn build(mut self) -> Result<Transcript, FeatureError> {
         let interval = coords_to_interval(self.start, self.end)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let features = resolve_transcript_features(
