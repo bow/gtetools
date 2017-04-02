@@ -1,0 +1,11 @@
+[package]
+name = "gnf"
+version = "0.1.0"
+authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
+
+[dependencies]
+bio = { git = "https://github.com/rust-bio/rust-bio.git", rev = "fbde62f" }
+
+[lib]
+name = "gnf"
+path = "src/mod.rs"

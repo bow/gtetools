@@ -1,5 +1,7 @@
 //! Interval-based annotation features.
 
+extern crate bio;
+
 use std::cmp::{max, min};
 use std::error::Error;
 use std::collections::HashMap;

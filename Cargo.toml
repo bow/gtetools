@@ -3,10 +3,11 @@ name = "gnftools"
 version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 
-[dependencies]
-bio = { git = "https://github.com/rust-bio/rust-bio.git", rev = "fbde62f" }
-
 [dependencies.clap]
 version = "~2.20.5"
 default-features = false
 features = ["suggestions", "wrap_help"]
+
+[[bin]]
+name = "gnftools"
+path = "src/main.rs"
