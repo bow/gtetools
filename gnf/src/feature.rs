@@ -273,14 +273,23 @@ pub fn infer_features(
         },
 
         // No CDS intervals mean we just sort the coordinates and create the exons
-        _ => m_exon_coords.iter()
-            .map(|&(start, end)| {
-                TxFeatureBuilder::new(transcript_seqname.clone(), start, end)
-                    .kind(TxFeature::Exon)
-                    .strand(*transcript_strand)
-                    .build()
-            })
-            .collect::<Result<Vec<TranscriptFeature>, FeatureError>>()
+        _ => {
+            let mut features = Vec::with_capacity(m_exon_coords.len());
+            for &(start, end) in m_exon_coords.iter() {
+                if start > end {
+                    return Err(FeatureError::SubFeatureIntervalError)
+                }
+                features.push(
+                    TranscriptFeature {
+                        seq_name: transcript_seqname.clone(),
+                        kind: TxFeature::Exon,
+                        interval: Interval::new(start..end).unwrap(),
+                        strand: *transcript_strand,
+                        attributes: HashMap::new(),
+                    });
+            }
+            Ok(features)
+        }
     }
 }
 
