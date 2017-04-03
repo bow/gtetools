@@ -2,13 +2,10 @@
 
 extern crate bio;
 
-use std::cmp::{max, min};
 use std::error::Error;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
-use std::iter::FromIterator;
 
-use bio::data_structures::interval_tree::IntervalTree;
 use bio::utils::{Interval, IntervalError, Strand};
 
 use self::error::FeatureError;
@@ -187,7 +184,7 @@ mod test_transcript {
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
-        assert_eq!(t.features().len(), 10, "{:?}", t.features());
+        assert_eq!(t.features().len(), 8, "{:?}", t.features());
     }
 }
 
@@ -196,133 +193,91 @@ pub fn infer_features(
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
     exon_coords: &Vec<(u64, u64)>,
-    cds_coord: Option<(u64, u64)>
+    cds_span: Option<(u64, u64)>
 ) -> Result<Vec<TranscriptFeature>, FeatureError>
 {
 
-    // A transcript must have an exon at this point
-    let first_exon_coord = exon_coords.first().ok_or(FeatureError::IncompleteTranscriptError)?;
-    // Get min exon start and max exon end for some sanity checks
-    let exon_iv: (u64, u64) = exon_coords.iter().skip(1)
-        .fold(*first_exon_coord, |acc, &(a, b)| (min(acc.0, a), max(acc.1, b)));
+    if exon_coords.len() == 0 {
+        return Err(FeatureError::IncompleteTranscriptError);
+    }
+    let mut m_exon_coords = exon_coords.clone();
+    m_exon_coords.sort();
 
-    if exon_iv.0 != transcript_interval.start || exon_iv.1 != transcript_interval.end {
+    let exon_r = (m_exon_coords.first().unwrap().0, m_exon_coords.last().unwrap().1);
+
+    if exon_r.0 != transcript_interval.start || exon_r.1 != transcript_interval.end {
         return Err(FeatureError::SubFeatureIntervalError);
     }
 
-    match exon_coords.len() {
-        0 => Err(FeatureError::IncompleteTranscriptError),
-        _ => match cds_coord {
+    match cds_span {
 
-            // Improper CDS interval is an error
-            Some(coord_cds) if coord_cds.0 > coord_cds.1 =>
-                Err(FeatureError::SubFeatureIntervalError),
+        // Improper CDS interval is an error
+        Some(cds_r) if cds_r.0 > cds_r.1 =>
+            Err(FeatureError::SubFeatureIntervalError),
 
-            // Presence of proper CDS interval means we can resolve UTRs and start/stop codons
-            Some(coord_cds) if coord_cds.0 < coord_cds.1 => {
-                // CDS coords must be fully enveloped by exon max-min
-                if coord_cds.0 < exon_iv.0 || coord_cds.1 > exon_iv.1 {
-                    return Err(FeatureError::SubFeatureIntervalError);
-                }
-                let nodes = exon_coords.iter().map(|&(a, b)| (a..b, ()));
-                let tree = IntervalTree::from_iter(nodes);
-                let mut features: Vec<TranscriptFeature> = Vec::new();
-
-                // Features at the 5' of cds interval
-                for fx5 in tree.find(transcript_interval.start..coord_cds.0) {
-                    let end = min(fx5.interval().end, coord_cds.0);
-                    let fx_interval = Interval::new(fx5.interval().start..end).unwrap();
-                    let utr = match *transcript_strand {
-                        Strand::Forward => TxFeature::UTR5,
-                        Strand::Reverse => TxFeature::UTR3,
-                        Strand::Unknown => TxFeature::UTR,
-                    };
-
-                    features.push(TranscriptFeature {
-                        seq_name: transcript_seqname.clone(),
-                        kind: TxFeature::Exon,
-                        interval: fx_interval.clone(),
-                        strand: *transcript_strand,
-                        attributes: HashMap::new(),
-                    });
-                    features.push(TranscriptFeature {
-                        seq_name: transcript_seqname.clone(),
-                        kind: utr,
-                        interval: fx_interval.clone(),
-                        strand: *transcript_strand,
-                        attributes: HashMap::new(),
-                    });
-                }
-                // CDS features
-                // TODO: Codons and frames
-                for fx in tree.find(coord_cds.0..coord_cds.1) {
-                    let start = max(coord_cds.0, fx.interval().start);
-                    let end = min(coord_cds.1, fx.interval().end);
-                    let fx_interval = Interval::new(start..end).unwrap();
-
-                    features.push(TranscriptFeature {
-                        seq_name: transcript_seqname.clone(),
-                        kind: TxFeature::Exon,
-                        interval: fx_interval.clone(),
-                        strand: *transcript_strand,
-                        attributes: HashMap::new(),
-                    });
-                    features.push(TranscriptFeature {
-                        seq_name: transcript_seqname.clone(),
-                        kind: TxFeature::CDS,
-                        interval: fx_interval.clone(),
-                        strand: *transcript_strand,
-                        attributes: HashMap::new(),
-                    });
-                }
-                // Features at the 3' of cds interval
-                for fx3 in tree.find(coord_cds.1..transcript_interval.end) {
-                    let start = max(fx3.interval().start, coord_cds.1);
-                    let fx_interval = Interval::new(start..fx3.interval().end).unwrap();
-                    let utr = match *transcript_strand {
-                        Strand::Forward => TxFeature::UTR3,
-                        Strand::Reverse => TxFeature::UTR5,
-                        Strand::Unknown => TxFeature::UTR,
-                    };
-
-                    features.push(TranscriptFeature {
-                        seq_name: transcript_seqname.clone(),
-                        kind: TxFeature::Exon,
-                        interval: fx_interval.clone(),
-                        strand: *transcript_strand,
-                        attributes: HashMap::new(),
-                    });
-                    features.push(TranscriptFeature {
-                        seq_name: transcript_seqname.clone(),
-                        kind: utr,
-                        interval: fx_interval.clone(),
-                        strand: *transcript_strand,
-                        attributes: HashMap::new(),
-                    });
-                }
-
-                Ok(features)
-            },
-
-            // No CDS intervals mean we just sort the coordinates and create the exons
-            _ => {
-                let mut exon_coords_s = exon_coords.clone();
-                exon_coords_s.sort();
-                if exon_coords_s.first().unwrap().0 < transcript_interval.start ||
-                    exon_coords_s.last().unwrap().1 > transcript_interval.end {
-                    return Err(FeatureError::SubFeatureIntervalError)
-                }
-
-                exon_coords_s.into_iter()
-                    .map(|(start, end)| {
-                        TxFeatureBuilder::new(transcript_seqname.clone(), start, end)
-                            .kind(TxFeature::Exon)
-                            .strand(*transcript_strand)
-                            .build()
-                    })
-                    .collect::<Result<Vec<TranscriptFeature>, FeatureError>>()
+        // Presence of proper CDS interval means we can resolve UTRs and start/stop codons
+        Some(cds_r) if cds_r.0 < cds_r.1 => {
+            // CDS coords must be fully enveloped by exon max-min
+            if cds_r.0 < exon_r.0 || cds_r.1 > exon_r.1 {
+                return Err(FeatureError::SubFeatureIntervalError);
             }
-        }
+            // Rough heuristic: num of features (incl exons) ~ 2 * num of exons
+            let mut features: Vec<TranscriptFeature> = Vec::with_capacity(m_exon_coords.len() * 2);
+            let utr1 = match *transcript_strand {
+                Strand::Forward => TxFeature::UTR5,
+                Strand::Reverse => TxFeature::UTR3,
+                Strand::Unknown => TxFeature::UTR,
+            };
+            let utr2 = match *transcript_strand {
+                Strand::Forward => TxFeature::UTR3,
+                Strand::Reverse => TxFeature::UTR5,
+                Strand::Unknown => TxFeature::UTR,
+            };
+            let make_feature = |kind, start, end| {
+                TranscriptFeature {
+                    seq_name: transcript_seqname.clone(),
+                    kind: kind,
+                    interval: Interval::new(start..end).unwrap(),
+                    strand: *transcript_strand,
+                    attributes: HashMap::new(),
+                }
+            };
+
+            // TODO: resolve start-stop codons
+            for &(start, end) in m_exon_coords.iter() {
+                features.push(make_feature(TxFeature::Exon, start, end));
+                // Whole UTR exon blocks
+                if end <= cds_r.0 {
+                    features.push(make_feature(utr1, start, end));
+                // UTR-CDS exon block
+                } else if start < cds_r.0 {
+                    features.push(make_feature(utr1, start, cds_r.0));
+                    features.push(make_feature(TxFeature::CDS, cds_r.0, end));
+                // Whole CDS exon blocks
+                } else if end <= cds_r.1 {
+                    features.push(make_feature(TxFeature::CDS, start, end));
+                // CDS-UTR exon block
+                } else if start <  cds_r.1 {
+                    features.push(make_feature(TxFeature::CDS, start, cds_r.1));
+                    features.push(make_feature(utr2, cds_r.1, end));
+                // Whole UTR exon blocks
+                } else {
+                    features.push(make_feature(utr2, start, end));
+                }
+            }
+
+            Ok(features)
+        },
+
+        // No CDS intervals mean we just sort the coordinates and create the exons
+        _ => m_exon_coords.iter()
+            .map(|&(start, end)| {
+                TxFeatureBuilder::new(transcript_seqname.clone(), start, end)
+                    .kind(TxFeature::Exon)
+                    .strand(*transcript_strand)
+                    .build()
+            })
+            .collect::<Result<Vec<TranscriptFeature>, FeatureError>>()
     }
 }
 
