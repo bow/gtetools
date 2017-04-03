@@ -245,6 +245,9 @@ pub fn infer_features(
 
             // TODO: resolve start-stop codons
             for &(start, end) in m_exon_coords.iter() {
+                if start > end {
+                    return Err(FeatureError::SubFeatureIntervalError)
+                }
                 features.push(make_feature(TxFeature::Exon, start, end));
                 // Whole UTR exon blocks
                 if end <= cds_r.0 {
