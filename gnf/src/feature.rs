@@ -58,7 +58,7 @@ pub mod error {
     }
 
     impl From<IntervalError> for FeatureError {
-        fn from(err: IntervalError) -> FeatureError {
+        fn from(_err: IntervalError) -> FeatureError {
             FeatureError::IntervalError
         }
     }
@@ -174,7 +174,7 @@ fn resolve_transcript_features(
     }
 }
 
-pub fn infer_features(
+fn infer_features(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
@@ -669,7 +669,7 @@ impl TranscriptBuilder {
         self
     }
 
-    pub fn build(mut self) -> Result<Transcript, FeatureError> {
+    pub fn build(self) -> Result<Transcript, FeatureError> {
         let interval = coords_to_interval(self.start, self.end)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let features = resolve_transcript_features(
