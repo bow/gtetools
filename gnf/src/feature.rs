@@ -7,7 +7,7 @@ use std::error::Error;
 use std::collections::HashMap;
 use std::fmt::{self, Display};
 
-use bio::utils::{Interval, IntervalError, Strand};
+use bio::utils::{Interval, IntervalError, Strand, StrandError};
 
 use self::error::FeatureError;
 
@@ -60,6 +60,12 @@ pub mod error {
     impl From<IntervalError> for FeatureError {
         fn from(err: IntervalError) -> FeatureError {
             FeatureError::IntervalError
+        }
+    }
+
+    impl From<StrandError> for FeatureError {
+        fn from(_err: StrandError) -> FeatureError {
+            FeatureError::StrandCharError
         }
     }
 }
@@ -116,22 +122,13 @@ pub enum TxFeature {
     Any,
 }
 
-fn char_to_strand(strand_char: char) -> Result<Strand, FeatureError> {
-    match strand_char {
-        '+' | 'f' | 'F' => Ok(Strand::Forward),
-        '-' | 'r' | 'R' => Ok(Strand::Reverse),
-        '.' | '?' => Ok(Strand::Unknown),
-        _ => Err(FeatureError::StrandCharError),
-    }
-}
-
 fn resolve_strand_input(strand: Option<Strand>, strand_char: Option<char>) -> Result<Strand, FeatureError> {
     match (strand, strand_char) {
         (None, None) => Err(FeatureError::UnspecifiedStrandError),
         (Some(sv), None) => Ok(sv),
-        (None, Some(scv)) => char_to_strand(scv),
-        (Some(sv), Some(scv)) => {
-            let sv_from_char = char_to_strand(scv)?;
+        (None, Some(ref scv)) => Strand::from_char(scv).map_err(FeatureError::from),
+        (Some(sv), Some(ref scv)) => {
+            let sv_from_char = Strand::from_char(scv).map_err(FeatureError::from)?;
             if sv == sv_from_char {
                 Ok(sv)
             } else {
