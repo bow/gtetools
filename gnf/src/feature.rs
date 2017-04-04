@@ -110,7 +110,7 @@ macro_rules! impl_annotation {
     );
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TxFeature {
     Exon,
     UTR,
@@ -119,7 +119,7 @@ pub enum TxFeature {
     CDS,
     StartCodon,
     StopCodon,
-    Any,
+    Any(String),
 }
 
 fn resolve_strand_input(strand: Option<Strand>, strand_char: Option<char>) -> Result<Strand, FeatureError> {
@@ -243,14 +243,14 @@ fn infer_features(
                 // Whole UTR exon blocks
                 if end <= cds_r.0 {
                     features.push(make_feature(TxFeature::Exon, start, end));
-                    features.push(make_feature(utr1, start, end));
+                    features.push(make_feature(utr1.clone(), start, end));
 
                 // UTR-CDS exon block
                 } else if start < cds_r.0 {
                     features.push(make_feature(TxFeature::Exon, start, end));
-                    features.push(make_feature(utr1, start, cds_r.0));
-                    if let Some(codon1) = mcodon1 {
-                        let codon = make_feature(codon1, cds_r.0, min(cds_r.0 + 3, end));
+                    features.push(make_feature(utr1.clone(), start, cds_r.0));
+                    if let Some(ref codon1) = mcodon1 {
+                        let codon = make_feature(codon1.clone(), cds_r.0, min(cds_r.0 + 3, end));
                         codon1_remaining -= codon.span();
                         features.push(codon);
                     }
@@ -260,9 +260,9 @@ fn infer_features(
                 } else if end < cds_r.1 {
                     features.push(make_feature(TxFeature::Exon, start, end));
                     if codon1_remaining > 0 {
-                        if let Some(codon1) = mcodon1 {
+                        if let Some(ref codon1) = mcodon1 {
                             let codon =
-                                make_feature(codon1, start, min(start + codon1_remaining, end));
+                                make_feature(codon1.clone(), start, min(start + codon1_remaining, end));
                             codon1_remaining -= codon.span();
                             features.push(codon);
                         }
@@ -274,9 +274,9 @@ fn infer_features(
                     features.push(make_feature(TxFeature::Exon, start, end));
                     features.push(make_feature(TxFeature::CDS, start, end));
                     if end - start >= codon2_remaining {
-                        if let Some(codon2) = mcodon2 {
+                        if let Some(ref codon2) = mcodon2 {
                             let codon =
-                                make_feature(codon2, max(start, cds_r.1 - codon2_remaining), end);
+                                make_feature(codon2.clone(), max(start, cds_r.1 - codon2_remaining), end);
                             codon2_remaining -= codon.span();
                             features.push(codon);
                         }
@@ -292,9 +292,9 @@ fn infer_features(
                             _ => 0,
                         };
                         if prev_end > 0 {
-                            if let Some(codon2) = mcodon2 {
+                            if let Some(ref codon2) = mcodon2 {
                                 let codon = make_feature(
-                                    codon2, prev_end - (codon2_remaining - (cds_r.1 - start)),
+                                    codon2.clone(), prev_end - (codon2_remaining - (cds_r.1 - start)),
                                     prev_end);
                                 codon2_remaining -= codon.span();
                                 features.push(codon);
@@ -303,18 +303,18 @@ fn infer_features(
                     }
                     features.push(make_feature(TxFeature::Exon, start, end));
                     features.push(make_feature(TxFeature::CDS, start, cds_r.1));
-                    if let Some(codon2) = mcodon2 {
+                    if let Some(ref codon2) = mcodon2 {
                         let codon =
-                            make_feature(codon2, max(start, cds_r.1 - codon2_remaining), cds_r.1);
+                            make_feature(codon2.clone(), max(start, cds_r.1 - codon2_remaining), cds_r.1);
                         codon2_remaining -= codon.span();
                         features.push(codon);
                     }
-                    features.push(make_feature(utr2, cds_r.1, end));
+                    features.push(make_feature(utr2.clone(), cds_r.1, end));
 
                 // Whole UTR exon blocks
                 } else {
                     features.push(make_feature(TxFeature::Exon, start, end));
-                    features.push(make_feature(utr2, start, end));
+                    features.push(make_feature(utr2.clone(), start, end));
                 }
             }
 
@@ -355,7 +355,7 @@ mod test_transcript {
     }
 
     fn get_features(fxs: &Vec<TranscriptFeature>) -> Vec<TxFeature> {
-        fxs.iter().map(|fx| *fx.kind()).collect()
+        fxs.iter().map(|fx| fx.kind().clone()).collect()
     }
 
     #[test]
@@ -545,22 +545,17 @@ pub struct TxFeatureBuilder {
 
 impl TxFeatureBuilder {
 
-    pub fn new<T>(seq_name: T, start: u64, end: u64) -> TxFeatureBuilder
+    pub fn new<T>(seq_name: T, start: u64, end: u64, kind: TxFeature) -> TxFeatureBuilder
         where T: Into<String>
     {
         TxFeatureBuilder {
             seq_name: seq_name.into(),
             start: start, end: end,
-            kind: TxFeature::Any,
+            kind: kind,
             attributes: HashMap::new(),
             strand: None,
             strand_char: None,
         }
-    }
-
-    pub fn kind(mut self, kind: TxFeature) -> TxFeatureBuilder {
-        self.kind = kind;
-        self
     }
 
     pub fn strand(mut self, strand: Strand) -> TxFeatureBuilder {
@@ -699,11 +694,11 @@ impl_annotation!(Gene);
 #[cfg(test)]
 mod test_transcript_feature {
     use super::*;
+    use self::TxFeature::*;
 
     #[test]
     fn builder() {
-        let tfm1 = TxFeatureBuilder::new("chrT", 10, 20)
-            .kind(TxFeature::Exon)
+        let tfm1 = TxFeatureBuilder::new("chrT", 10, 20, Exon)
             .strand(Strand::Forward)
             .attribute("name", "ex1")
             .build();
@@ -715,7 +710,7 @@ mod test_transcript_feature {
         assert_eq!(tf.attribute("name"), Some("ex1"));
         assert_eq!(tf.attributes.len(), 1);
 
-        let tfm2 = TxFeatureBuilder::new("chrO", 10, 10)
+        let tfm2 = TxFeatureBuilder::new("chrO", 10, 10, Exon)
             .strand_char('-')
             .strand(Strand::Reverse)
             .build();
@@ -724,14 +719,15 @@ mod test_transcript_feature {
 
     #[test]
     fn builder_interval_invalid() {
-        let tfm = TxFeatureBuilder::new("chrE", 20, 10).build();
+        let tfm = TxFeatureBuilder::new("chrE", 20, 10, Exon)
+            .build();
         assert!(tfm.is_err());
         assert_eq!(tfm.unwrap_err(), FeatureError::IntervalError);
     }
 
     #[test]
     fn builder_strand_unspecified() {
-        let tfm = TxFeatureBuilder::new("chrT", 20, 30)
+        let tfm = TxFeatureBuilder::new("chrT", 20, 30, Exon)
             .build();
         assert!(tfm.is_err());
         assert_eq!(tfm.unwrap_err(), FeatureError::UnspecifiedStrandError);
@@ -739,7 +735,7 @@ mod test_transcript_feature {
 
     #[test]
     fn builder_strand_char_unexpected() {
-        let tfm = TxFeatureBuilder::new("chrE", 10, 20)
+        let tfm = TxFeatureBuilder::new("chrE", 10, 20, Exon)
             .strand_char('w')
             .build();
         assert!(tfm.is_err());
@@ -748,7 +744,7 @@ mod test_transcript_feature {
 
     #[test]
     fn builder_strand_char_conflicting() {
-        let tfm = TxFeatureBuilder::new("chrE", 10, 20)
+        let tfm = TxFeatureBuilder::new("chrE", 10, 20, Exon)
             .strand_char('-')
             .strand(Strand::Reverse)
             .build();
