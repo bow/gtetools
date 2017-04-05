@@ -7,6 +7,7 @@ authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 bio = "~0.12.0"
 quick-error = "~1.1.0"
 matches = "~0.1.4"
+sliding_windows = "~2.0"
 
 [lib]
 name = "gnf"

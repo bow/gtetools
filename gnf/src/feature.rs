@@ -4,8 +4,10 @@ extern crate bio;
 
 use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::iter;
 
 use bio::utils::{self, Interval, IntervalError, Strand};
+use sliding_windows::{IterExt, Storage};
 
 use self::error::FeatureError;
 
@@ -198,6 +200,7 @@ fn infer_features(
             // Rough heuristic: num of features (incl exons) ~ 2 * num of exons + 4
             let mut features: Vec<TranscriptFeature> =
                 Vec::with_capacity(m_exon_coords.len() * 2 + 4);
+
             let (utr1, mcodon1) = match *transcript_strand {
                 Strand::Forward => (TxFeature::UTR5, Some(TxFeature::StartCodon)),
                 Strand::Reverse => (TxFeature::UTR3, Some(TxFeature::StopCodon)),
@@ -220,7 +223,14 @@ fn infer_features(
             };
 
             let (mut codon1_remaining, mut codon2_remaining) = (3, 3);
-            for &(start, end) in m_exon_coords.iter() {
+            let iter = iter::repeat(None).take(2)
+                .chain(m_exon_coords.iter().map(|&v| Some(v)));
+            let mut window_storage: Storage<Option<(u64, u64)>> = Storage::optimized(&iter, 3);
+
+            for window in iter.sliding_windows(&mut window_storage) {
+
+                let prev1 = window[1];
+                let (start, end) = window[2].unwrap();
 
                 // Whole UTR exon blocks
                 if end <= cds_r.0 {
@@ -266,23 +276,18 @@ fn infer_features(
 
                 // CDS-UTR exon block
                 } else if start < cds_r.1 {
-                    // FIXME: This will break when a stop codon is split into 3.
-                    //        Not to mention it looks ugly :(.
                     if cds_r.1 - start < codon2_remaining {
-                        let prev_end = match features.last().as_ref() {
-                            Some(&fx) => fx.interval().end,
-                            _ => 0,
-                        };
-                        if prev_end > 0 {
+                        if let Some((_, end_prev1)) = prev1 {
                             if let Some(ref codon2) = mcodon2 {
                                 let codon = make_feature(
-                                    codon2.clone(), prev_end - (codon2_remaining - (cds_r.1 - start)),
-                                    prev_end);
+                                    codon2.clone(), end_prev1 - (codon2_remaining - (cds_r.1 - start)),
+                                    end_prev1);
                                 codon2_remaining -= codon.span();
                                 features.push(codon);
                             }
                         }
                     }
+
                     features.push(make_feature(TxFeature::Exon, start, end));
                     features.push(make_feature(TxFeature::CDS, start, cds_r.1));
                     if let Some(ref codon2) = mcodon2 {
