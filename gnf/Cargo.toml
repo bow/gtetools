@@ -5,6 +5,8 @@ authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 
 [dependencies]
 bio = "~0.12.0"
+quick-error = "~1.1.0"
+matches = "~0.1.4"
 
 [lib]
 name = "gnf"

@@ -3,11 +3,9 @@
 extern crate bio;
 
 use std::cmp::{max, min};
-use std::error::Error;
 use std::collections::HashMap;
-use std::fmt::{self, Display};
 
-use bio::utils::{Interval, IntervalError, Strand, StrandError};
+use bio::utils::{self, Interval, IntervalError, Strand};
 
 use self::error::FeatureError;
 
@@ -16,56 +14,34 @@ pub mod error {
 
     use super::*;
 
-    #[derive(Debug, PartialEq)]
-    pub enum FeatureError {
-        IntervalError,
-        StrandCharError,
-        ConflictingStrandError,
-        UnspecifiedStrandError,
-        SubFeatureIntervalError,
-        IncompleteTranscriptError,
-    }
-
-    impl Error for FeatureError {
-
-        fn description(&self) -> &str {
-            match *self {
-                FeatureError::IntervalError =>
-                    "interval start coordinate larger than its end coordinate",
-                FeatureError::StrandCharError =>
-                    "strand character is invalid",
-                FeatureError::ConflictingStrandError =>
-                    "conflicting strand inputs specified",
-                FeatureError::UnspecifiedStrandError =>
-                    "strand not specified",
-                FeatureError::SubFeatureIntervalError =>
-                    "subfeature interval is not completely enveloped by parent",
-                FeatureError::IncompleteTranscriptError =>
-                    "transcript annotation is incomplete",
+    quick_error! {
+        #[derive(Debug)]
+        pub enum FeatureError {
+            IntervalError(err: utils::IntervalError) {
+                description(
+                    match err {
+                        &IntervalError::InvalidRange =>
+                            "interval start coordinate larger than its end coordinate",
+                        ref otherwise => otherwise.description(),
+                    })
+                from()
             }
-        }
-
-        fn cause(&self) -> Option<&Error> {
-            None
-        }
-    }
-
-    impl Display for FeatureError {
-
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "FeatureError: {}", self.description())
-        }
-    }
-
-    impl From<IntervalError> for FeatureError {
-        fn from(_err: IntervalError) -> FeatureError {
-            FeatureError::IntervalError
-        }
-    }
-
-    impl From<StrandError> for FeatureError {
-        fn from(_err: StrandError) -> FeatureError {
-            FeatureError::StrandCharError
+            StrandCharError(err: utils::StrandError) {
+                description(err.description())
+                from()
+            }
+            ConflictingStrandError {
+                description("conflicting strand inputs specified")
+            }
+            UnspecifiedStrandError {
+                description("strand not specified")
+            }
+            SubFeatureIntervalError {
+                description("subfeature interval is not completely enveloped by parent")
+            }
+            IncompleteTranscriptError {
+                description("transcript annotation is incomplete")
+            }
         }
     }
 }
@@ -752,7 +728,8 @@ mod test_transcript_feature {
         let tfm = TxFeatureBuilder::new("chrE", 20, 10, Exon)
             .build();
         assert!(tfm.is_err());
-        assert_eq!(tfm.unwrap_err(), FeatureError::IntervalError);
+        assert!(matches!(tfm.unwrap_err(),
+                         FeatureError::IntervalError(utils::IntervalError::InvalidRange)));
     }
 
     #[test]
@@ -760,7 +737,7 @@ mod test_transcript_feature {
         let tfm = TxFeatureBuilder::new("chrT", 20, 30, Exon)
             .build();
         assert!(tfm.is_err());
-        assert_eq!(tfm.unwrap_err(), FeatureError::UnspecifiedStrandError);
+        assert!(matches!(tfm.unwrap_err(), FeatureError::UnspecifiedStrandError));
     }
 
     #[test]
@@ -769,7 +746,8 @@ mod test_transcript_feature {
             .strand_char('w')
             .build();
         assert!(tfm.is_err());
-        assert_eq!(tfm.unwrap_err(), FeatureError::StrandCharError);
+        assert!(matches!(tfm.unwrap_err(),
+                         FeatureError::StrandCharError(utils::StrandError::InvalidChar(_))));
     }
 
     #[test]
