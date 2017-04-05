@@ -76,6 +76,7 @@ pub trait Annotation {
     fn attributes(&self) -> &HashMap<String, String>;
     fn attribute(&self, key: &str) -> Option<&str>;
     fn strand(&self) -> &Strand;
+    fn id(&self) -> Option<&str>;
     fn span(&self) -> u64 {
         self.interval().end - self.interval().start
     }
@@ -104,6 +105,10 @@ macro_rules! impl_annotation {
 
             fn strand(&self) -> &Strand {
                 &self.strand
+            }
+
+            fn id(&self) -> Option<&str> {
+                self.id.as_ref().map(|ref n| n.as_str())
             }
         }
 
@@ -234,6 +239,7 @@ fn infer_features(
                     interval: Interval::new(start..end).unwrap(),
                     strand: *transcript_strand,
                     attributes: HashMap::new(),
+                    id: None,
                 }
             };
 
@@ -334,6 +340,7 @@ fn infer_features(
                         kind: TxFeature::Exon,
                         interval: Interval::new(start..end).unwrap(),
                         strand: *transcript_strand,
+                        id: None,
                         attributes: HashMap::new(),
                     });
             }
@@ -521,6 +528,7 @@ pub struct TranscriptFeature {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
+    id: Option<String>,
     attributes: HashMap<String, String>
 }
 
@@ -541,6 +549,7 @@ pub struct TxFeatureBuilder {
     kind: TxFeature,
     strand: Option<Strand>,
     strand_char: Option<char>,
+    id: Option<String>,
 }
 
 impl TxFeatureBuilder {
@@ -555,6 +564,7 @@ impl TxFeatureBuilder {
             attributes: HashMap::new(),
             strand: None,
             strand_char: None,
+            id: None,
         }
     }
 
@@ -575,12 +585,19 @@ impl TxFeatureBuilder {
         self
     }
 
+    pub fn id<T>(mut self, id: T) -> TxFeatureBuilder
+        where T: Into<String>
+    {
+        self.id = Some(id.into());
+        self
+    }
+
     pub fn build(self) -> Result<TranscriptFeature, FeatureError> {
         let interval = coords_to_interval(self.start, self.end)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let feature = TranscriptFeature {
             seq_name: self.seq_name, kind: self.kind, interval: interval,
-            strand: strand, attributes: self.attributes,
+            strand: strand, attributes: self.attributes, id: self.id,
         };
         Ok(feature)
     }
@@ -591,6 +608,7 @@ pub struct Transcript {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
+    id: Option<String>,
     attributes: HashMap<String, String>,
     features: Vec<TranscriptFeature>,
 }
@@ -615,6 +633,7 @@ pub struct TranscriptBuilder {
     // NOTE: Can we instead of using Vec<_> here keep it as an unconsumed iterator?
     exon_coords: Option<Vec<(u64, u64)>>,
     cds_coord: Option<(u64, u64)>,
+    id: Option<String>,
     attributes: HashMap<String, String>,
 }
 
@@ -631,6 +650,7 @@ impl TranscriptBuilder {
             features: None,
             exon_coords: None,
             cds_coord: None,
+            id: None,
             attributes: HashMap::new(),
         }
     }
@@ -649,6 +669,13 @@ impl TranscriptBuilder {
         where K: Into<String>, V: Into<String>
     {
         self.attributes.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn id<T>(mut self, id: T) -> TranscriptBuilder
+        where T: Into<String>
+    {
+        self.id = Some(id.into());
         self
     }
 
@@ -673,7 +700,7 @@ impl TranscriptBuilder {
 
         let transcript = Transcript {
             seq_name: self.seq_name, interval: interval, strand: strand,
-            features: features, attributes: self.attributes,
+            features: features, attributes: self.attributes, id: self.id,
         };
         Ok(transcript)
     }
@@ -684,6 +711,7 @@ pub struct Gene {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
+    id: Option<String>,
     attributes: HashMap<String, String>,
     transcripts: HashMap<String, Transcript>,
 }
@@ -701,12 +729,14 @@ mod test_transcript_feature {
         let tfm1 = TxFeatureBuilder::new("chrT", 10, 20, Exon)
             .strand(Strand::Forward)
             .attribute("name", "ex1")
+            .id("ex1.1")
             .build();
         assert!(tfm1.is_ok());
         let tf = tfm1.unwrap();
         assert_eq!(tf.seq_name(), "chrT");
         assert_eq!(tf.kind(), &TxFeature::Exon);
         assert_eq!(tf.strand(), &Strand::Forward);
+        assert_eq!(tf.id(), Some("ex1.1"));
         assert_eq!(tf.attribute("name"), Some("ex1"));
         assert_eq!(tf.attributes.len(), 1);
 

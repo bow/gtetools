@@ -18,6 +18,7 @@ mod tests {
         b.iter(|| {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
+                .id("trx01")
                 .exon_and_cds_coords(
                     vec![(100, 10000)], None)
                 .build()
@@ -29,6 +30,7 @@ mod tests {
         b.iter(|| {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
+                .id("trx01")
                 .exon_and_cds_coords(
                     vec![(100, 10000)], Some((200, 9500)))
                 .build()
@@ -40,6 +42,7 @@ mod tests {
         b.iter(|| {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
+                .id("trx01")
                 .exon_and_cds_coords(
                     vec![
                         (100, 300), (400, 500), (700, 1000),
@@ -56,6 +59,7 @@ mod tests {
         b.iter(|| {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
+                .id("trx01")
                 .exon_and_cds_coords(
                     vec![
                         (100, 300), (400, 500), (700, 1000),
