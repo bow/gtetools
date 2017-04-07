@@ -19,7 +19,7 @@ mod tests {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .exon_and_cds_coords(
+                .feature_coords(
                     vec![(100, 10000)], None)
                 .build()
         });
@@ -31,7 +31,7 @@ mod tests {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .exon_and_cds_coords(
+                .feature_coords(
                     vec![(100, 10000)], Some((200, 9500)))
                 .build()
         });
@@ -43,7 +43,7 @@ mod tests {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .exon_and_cds_coords(
+                .feature_coords(
                     vec![
                         (100, 300), (400, 500), (700, 1000),
                         (1100, 1300), (1400, 1500), (1700, 2000),
@@ -60,7 +60,7 @@ mod tests {
             TranscriptBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .exon_and_cds_coords(
+                .feature_coords(
                     vec![
                         (100, 300), (400, 500), (700, 1000),
                         (1100, 1300), (1400, 1500), (1700, 2000),

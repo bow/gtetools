@@ -131,14 +131,14 @@ fn resolve_transcript_features(
     transcript_strand: &Strand,
     features: Option<Vec<TranscriptFeature>>,
     exon_coords: Option<&Vec<(u64, u64)>>,
-    orf_coord: Option<(u64, u64)>
+    coding_coord: Option<(u64, u64)>
 ) -> Result<Vec<TranscriptFeature>, FeatureError>
 {
     // Deliberately not handling all possible input types to avoid
     // overcomplicating code. The inputs are expected to come from
     // either GTF or refFlat after all.
 
-    match (features, exon_coords, orf_coord) {
+    match (features, exon_coords, coding_coord) {
         // nothing defined -> the transcript doesn't have any known subfeatures
         (None, None, None) => Ok(Vec::new()),
 
@@ -151,9 +151,9 @@ fn resolve_transcript_features(
         (Some(fxs), _, _) => Ok(fxs.into_iter().collect()),
 
         // exon defined & coords possibly defined (refFlat input)
-        (None, Some(raw_exon_coords), raw_orf_coord) =>
+        (None, Some(raw_exon_coords), raw_coding_coord) =>
             infer_features(transcript_seqname, transcript_interval,
-                           transcript_strand, raw_exon_coords, raw_orf_coord),
+                           transcript_strand, raw_exon_coords, raw_coding_coord),
     }
 }
 
@@ -162,7 +162,7 @@ fn infer_features(
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
     exon_coords: &Vec<(u64, u64)>,
-    orf_coord: Option<(u64, u64)>
+    coding_coord: Option<(u64, u64)>
 ) -> Result<Vec<TranscriptFeature>, FeatureError>
 {
 
@@ -184,16 +184,16 @@ fn infer_features(
         return Err(FeatureError::SubFeatureIntervalError);
     }
 
-    match orf_coord {
+    match coding_coord {
 
-        // Improper CDS interval is an error
-        Some(orf_r) if orf_r.0 > orf_r.1 =>
+        // Improper coding region is an error
+        Some(coding_r) if coding_r.0 > coding_r.1 =>
             Err(FeatureError::SubFeatureIntervalError),
 
-        // Presence of proper CDS interval means we can resolve UTRs and start/stop codons
-        Some(orf_r) if orf_r.0 < orf_r.1 => {
-            // CDS coords must be fully enveloped by exon max-min
-            if orf_r.0 < exon_r.0 || orf_r.1 > exon_r.1 {
+        // Presence of proper coding region means we can resolve UTRs
+        Some(coding_r) if coding_r.0 < coding_r.1 => {
+            // coding coord must be fully enveloped by exon max-min
+            if coding_r.0 < exon_r.0 || coding_r.1 > exon_r.1 {
                 return Err(FeatureError::SubFeatureIntervalError);
             }
             // TODO: no exon start == CDS end and no exon end == CDS start
@@ -201,16 +201,12 @@ fn infer_features(
             let mut features: Vec<TranscriptFeature> =
                 Vec::with_capacity(m_exon_coords.len() * 2 + 4);
 
-            let (utr1, mcodon1) = match *transcript_strand {
-                Strand::Forward => (TxFeature::UTR5, Some(TxFeature::StartCodon)),
-                Strand::Reverse => (TxFeature::UTR3, Some(TxFeature::StopCodon)),
-                Strand::Unknown => (TxFeature::UTR, None),
+            let (utr1, utr2) = match transcript_strand {
+                &Strand::Forward => (TxFeature::UTR5, TxFeature::UTR3),
+                &Strand::Reverse => (TxFeature::UTR3, TxFeature::UTR5),
+                &Strand::Unknown => (TxFeature::UTR, TxFeature::UTR),
             };
-            let (utr2, mcodon2) = match *transcript_strand {
-                Strand::Forward => (TxFeature::UTR3, Some(TxFeature::StopCodon)),
-                Strand::Reverse => (TxFeature::UTR5, Some(TxFeature::StartCodon)),
-                Strand::Unknown => (TxFeature::UTR, None),
-            };
+
             let make_feature = |kind, start, end| {
                 TranscriptFeature {
                     seq_name: transcript_seqname.clone(),
@@ -222,85 +218,230 @@ fn infer_features(
                 }
             };
 
+            // TODO: Look at using proper trees instead of these manual steps.
             let (mut codon1_remaining, mut codon2_remaining) = (3, 3);
-            let iter = iter::repeat(None).take(2)
+            let window_size = 4;
+            let iter = iter::repeat(None).take(window_size-1)
                 .chain(m_exon_coords.iter().map(|&v| Some(v)));
-            let mut window_storage: Storage<Option<(u64, u64)>> = Storage::optimized(&iter, 3);
-
+            let mut window_storage: Storage<Option<(u64, u64)>> =
+                Storage::optimized(&iter, window_size);
             for window in iter.sliding_windows(&mut window_storage) {
 
-                let prev1 = window[1];
-                let (start, end) = window[2].unwrap();
+                let (start, end) = window[window_size-1].unwrap();
 
                 // Whole UTR exon blocks
-                if end <= orf_r.0 {
+                if end < coding_r.0 {
                     features.push(make_feature(TxFeature::Exon, start, end));
                     features.push(make_feature(utr1.clone(), start, end));
 
-                // UTR-CDS exon block
-                } else if start < orf_r.0 {
+                // Whole UTR exon block with potential stop codon
+                } else if end == coding_r.0 {
                     features.push(make_feature(TxFeature::Exon, start, end));
-                    features.push(make_feature(utr1.clone(), start, orf_r.0));
-                    if let Some(ref codon1) = mcodon1 {
-                        let codon = make_feature(codon1.clone(), orf_r.0, min(orf_r.0 + 3, end));
-                        codon1_remaining -= codon.span();
-                        features.push(codon);
+                    features.push(make_feature(utr1.clone(), start, end));
+                    if let &Strand::Reverse = transcript_strand {
+                        let mut codon_remaining = 3;
+                        let fx = make_feature(TxFeature::StopCodon,
+                                                max(start, coding_r.0 - codon_remaining),
+                                                coding_r.0);
+                        codon_remaining -= fx.span();
+                        features.push(fx);
+                        let mut backtrack = 1;
+                        while codon_remaining > 0 && backtrack < (window_size-1) {
+                            if let Some(prev) = window[window_size-(backtrack+1)] {
+                                let fx = make_feature(TxFeature::StopCodon,
+                                                        max(prev.0, prev.1 - codon_remaining),
+                                                        prev.1);
+                                codon_remaining -= fx.span();
+                                backtrack = backtrack + 1;
+                                features.push(fx);
+                            }
+                        };
+                        if backtrack > 1 {
+                            features.sort_by_key(|f| (f.interval().start));
+                        }
                     }
-                    features.push(make_feature(TxFeature::CDS, orf_r.0, end));
+
+                // UTR-CDS exon block
+                } else if start < coding_r.0 {
+                    features.push(make_feature(TxFeature::Exon, start, end));
+                    features.push(make_feature(utr1.clone(), start, coding_r.0));
+
+                    match transcript_strand {
+                        &Strand::Forward => {
+                            let fx = make_feature(TxFeature::StartCodon,
+                                                  coding_r.0,
+                                                  min(coding_r.0 + codon1_remaining, end));
+                            codon1_remaining -= fx.span();
+                            features.push(fx);
+                        },
+                        &Strand::Reverse => {
+                            // most complex case: stop codon split over 3 previous 1-bp exons
+                            // biologically unexpected but technically possible
+                            let mut codon_remaining = 3;
+                            let fx = make_feature(TxFeature::StopCodon,
+                                                  max(start, coding_r.0 - codon_remaining),
+                                                  coding_r.0);
+                            codon_remaining -= fx.span();
+                            features.push(fx);
+                            let mut backtrack = 1;
+                            while codon_remaining > 0 && backtrack < (window_size-1) {
+                                if let Some(prev) = window[window_size-(backtrack+1)] {
+                                    let fx = make_feature(TxFeature::StopCodon,
+                                                          max(prev.0, prev.1 - codon_remaining),
+                                                          prev.1);
+                                    codon_remaining -= fx.span();
+                                    backtrack = backtrack + 1;
+                                    features.push(fx);
+                                }
+                            };
+                            if backtrack > 1 {
+                                features.sort_by_key(|f| (f.interval().start));
+                            }
+                        },
+                        &Strand::Unknown => {},
+                    }
+                    features.push(make_feature(TxFeature::CDS, coding_r.0, end));
 
                 // Whole CDS exon blocks
-                } else if end < orf_r.1 {
+                } else if end < coding_r.1 {
                     features.push(make_feature(TxFeature::Exon, start, end));
+
                     if codon1_remaining > 0 {
-                        if let Some(ref codon1) = mcodon1 {
-                            let codon =
-                                make_feature(codon1.clone(), start, min(start + codon1_remaining, end));
-                            codon1_remaining -= codon.span();
-                            features.push(codon);
+                        match transcript_strand {
+                            &Strand::Forward => {
+                                // Ensure the start codon coordinate is not in an intron
+                                let start_ok = window.iter()
+                                    .flat_map(|item| item.iter())
+                                    .any(|&(a, b)| (a <= coding_r.0) && (coding_r.0 <= b));
+                                if !start_ok {
+                                    return Err(FeatureError::SubFeatureIntervalError);
+                                }
+
+                                let fx = make_feature(TxFeature::StartCodon,
+                                                    start,
+                                                    min(start + codon1_remaining, end));
+                                codon1_remaining -= fx.span();
+                                features.push(fx);
+                            },
+                            &Strand::Reverse if start == coding_r.0 => {
+                                let mut codon_remaining = codon1_remaining;
+                                let mut backtrack = 1;
+                                while codon_remaining > 0 && backtrack < (window_size-1) {
+                                    if let Some(prev) = window[window_size-(backtrack+1)] {
+                                        let fx = make_feature(TxFeature::StopCodon,
+                                                              max(prev.0, prev.1 - codon_remaining),
+                                                              prev.1);
+                                        codon_remaining -= fx.span();
+                                        backtrack = backtrack + 1;
+                                        features.push(fx);
+                                    }
+                                };
+                                if backtrack > 1 {
+                                    features.sort_by_key(|f| (f.interval().start));
+                                }
+                            },
+                            _ => {},
                         }
                     }
                     features.push(make_feature(TxFeature::CDS, start, end));
 
                 // Whole CDS exon blocks at the end
-                } else if end == orf_r.1 {
+                } else if end == coding_r.1 {
                     features.push(make_feature(TxFeature::Exon, start, end));
                     features.push(make_feature(TxFeature::CDS, start, end));
-                    if end - start >= codon2_remaining {
-                        if let Some(ref codon2) = mcodon2 {
-                            let codon =
-                                make_feature(codon2.clone(), max(start, orf_r.1 - codon2_remaining), end);
-                            codon2_remaining -= codon.span();
-                            features.push(codon);
+
+                    if let &Strand::Reverse = transcript_strand {
+                        let fx = make_feature(TxFeature::StartCodon,
+                                              max(start, coding_r.1 - codon2_remaining),
+                                              coding_r.1);
+                        codon2_remaining -= fx.span();
+                        features.push(fx);
+                        let mut backtrack = 1;
+                        while codon2_remaining > 0 && backtrack < (window_size-1) {
+                            if let Some(prev) = window[window_size-(backtrack+1)] {
+                                let fx = make_feature(TxFeature::StartCodon,
+                                                      max(prev.0, prev.1 - codon2_remaining),
+                                                      prev.1);
+                                codon2_remaining -= fx.span();
+                                backtrack = backtrack + 1;
+                                features.push(fx);
+                            }
+                        };
+                        if backtrack > 1 {
+                            features.sort_by_key(|f| (f.interval().start));
                         }
                     }
 
                 // CDS-UTR exon block
-                } else if start < orf_r.1 {
-                    if orf_r.1 - start < codon2_remaining {
-                        if let Some((_, end_prev1)) = prev1 {
-                            if let Some(ref codon2) = mcodon2 {
-                                let codon = make_feature(
-                                    codon2.clone(), end_prev1 - (codon2_remaining - (orf_r.1 - start)),
-                                    end_prev1);
-                                codon2_remaining -= codon.span();
-                                features.push(codon);
-                            }
-                        }
-                    }
-
+                } else if start < coding_r.1 {
                     features.push(make_feature(TxFeature::Exon, start, end));
-                    features.push(make_feature(TxFeature::CDS, start, orf_r.1));
-                    if let Some(ref codon2) = mcodon2 {
-                        let codon =
-                            make_feature(codon2.clone(), max(start, orf_r.1 - codon2_remaining), orf_r.1);
-                        codon2_remaining -= codon.span();
-                        features.push(codon);
+                    features.push(make_feature(TxFeature::CDS, start, coding_r.1));
+
+                    match transcript_strand {
+                        &Strand::Forward => {
+                            let fx = make_feature(TxFeature::StopCodon,
+                                                  coding_r.1,
+                                                  min(coding_r.1 + codon2_remaining, end));
+                            codon2_remaining -= fx.span();
+                            features.push(fx);
+                        },
+                        &Strand::Reverse => {
+                            let mut codon_remaining = 3;
+                            let fx = make_feature(TxFeature::StartCodon,
+                                                  max(start, coding_r.1 - codon_remaining),
+                                                  coding_r.1);
+                            codon_remaining -= fx.span();
+                            features.push(fx);
+                            let mut backtrack = 1;
+                            while codon_remaining > 0 && backtrack < (window_size-1) {
+                                if let Some(prev) = window[window_size-(backtrack+1)] {
+                                    let fx = make_feature(TxFeature::StartCodon,
+                                                          max(prev.0, prev.1 - codon_remaining),
+                                                          prev.1);
+                                    codon_remaining -= fx.span();
+                                    backtrack = backtrack + 1;
+                                    features.push(fx);
+                                }
+                            };
+                            if backtrack > 1 {
+                                features.sort_by_key(|f| (f.interval().start));
+                            }
+                        },
+                        &Strand::Unknown => {},
                     }
-                    features.push(make_feature(utr2.clone(), orf_r.1, end));
+                    features.push(make_feature(utr2.clone(), coding_r.1, end));
 
                 // Whole UTR exon blocks
                 } else {
                     features.push(make_feature(TxFeature::Exon, start, end));
+                    if codon2_remaining > 0 {
+                        match transcript_strand {
+                            &Strand::Forward => {
+                                let fx = make_feature(TxFeature::StopCodon,
+                                                    start,
+                                                    min(start + codon2_remaining, end));
+                                codon2_remaining -= fx.span();
+                                features.push(fx);
+                            },
+                            &Strand::Reverse => {
+                                let mut backtrack = 1;
+                                while codon2_remaining > 0 && backtrack < (window_size-1) {
+                                    if let Some(prev) = window[window_size-(backtrack+1)] {
+                                        let fx = make_feature(TxFeature::StartCodon,
+                                                              max(prev.0, prev.1 - codon2_remaining),
+                                                              prev.1);
+                                        codon2_remaining -= fx.span();
+                                        backtrack = backtrack + 1;
+                                        features.push(fx);
+                                    }
+                                };
+                                if backtrack > 1 {
+                                    features.sort_by_key(|f| (f.interval().start));
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
                     features.push(make_feature(utr2.clone(), start, end));
                 }
             }
@@ -347,7 +488,7 @@ mod test_transcript {
     }
 
     #[test]
-    fn builder_from_coords() {
+    fn builder_coords_fwd() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], None)
@@ -355,13 +496,13 @@ mod test_transcript {
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
         let fxs = t.features();
-        assert_eq!(fxs.iter().filter(|fx| *fx.kind() == Exon).count(), 3);
+        assert_eq!(get_features(fxs), vec![Exon, Exon, Exon]);
         assert_eq!(get_coords_by_feature(fxs, Exon),
                    vec![(100, 300), (400, 500), (700, 1000)]);
     }
 
     #[test]
-    fn builder_from_coords_with_cds_fwd() {
+    fn builder_coords_fwd_coding() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 900)))
@@ -376,53 +517,12 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(897, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
     }
 
     #[test]
-    fn builder_from_coords_with_cds_fwd_start_codon_at_end() {
-        let tm = TranscriptBuilder::new("chrT", 100, 1000)
-            .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((297, 900)))
-            .build();
-        assert!(tm.is_ok(), "{:?}", tm);
-        let t = tm.unwrap();
-        let fxs = t.features();
-        assert_eq!(get_features(fxs),
-                   vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, Exon, CDS, StopCodon, UTR3]);
-        assert_eq!(get_coords_by_feature(fxs, Exon),
-                   vec![(100, 300), (400, 500), (700, 1000)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 297)]);
-        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(297, 300)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(297, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(897, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
-    }
-
-    #[test]
-    fn builder_from_coords_with_cds_fwd_start_codon_split() {
-        let tm = TranscriptBuilder::new("chrT", 100, 1000)
-            .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((299, 900)))
-            .build();
-        assert!(tm.is_ok(), "{:?}", tm);
-        let t = tm.unwrap();
-        let fxs = t.features();
-        assert_eq!(get_features(fxs),
-                   vec![Exon, UTR5, StartCodon, CDS, Exon, StartCodon, CDS, Exon, CDS,
-                        StopCodon, UTR3]);
-        assert_eq!(get_coords_by_feature(fxs, Exon),
-                   vec![(100, 300), (400, 500), (700, 1000)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 299)]);
-        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(299, 300), (400, 402)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(299, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(897, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
-    }
-
-    #[test]
-    fn builder_from_coords_with_cds_fwd_start_codon_at_start() {
+    fn builder_coords_fwd_coding_from_exon5end() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((400, 900)))
@@ -437,56 +537,35 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 300)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(400, 403)]);
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(897, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
     }
 
     #[test]
-    fn builder_from_coords_with_cds_fwd_stop_codon_at_end() {
+    fn builder_coords_fwd_coding_from_exon3end() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 500)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((300, 900)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
         let fxs = t.features();
         assert_eq!(get_features(fxs),
-                   vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, StopCodon, Exon, UTR3]);
+                   vec![Exon, UTR5, Exon, StartCodon, CDS, Exon, CDS, StopCodon, UTR3]);
         assert_eq!(get_coords_by_feature(fxs, Exon),
                    vec![(100, 300), (400, 500), (700, 1000)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
-        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(497, 500)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 300)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(400, 403)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
     }
 
     #[test]
-    fn builder_from_coords_with_cds_fwd_stop_codon_split() {
+    fn builder_coords_fwd_coding_from_near_exon3end() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 701)))
-            .build();
-        assert!(tm.is_ok(), "{:?}", tm);
-        let t = tm.unwrap();
-        let fxs = t.features();
-        assert_eq!(get_features(fxs),
-                   vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, StopCodon, Exon, CDS, StopCodon,
-                        UTR3]);
-        assert_eq!(get_coords_by_feature(fxs, Exon),
-                   vec![(100, 300), (400, 500), (700, 1000)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
-        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 701)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(498, 500), (700, 701)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(701, 1000)]);
-    }
-
-    #[test]
-    fn builder_from_coords_with_cds_fwd_stop_codon_at_start() {
-        let tm = TranscriptBuilder::new("chrT", 100, 1000)
-            .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 703)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((297, 900)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -495,11 +574,244 @@ mod test_transcript {
                    vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, Exon, CDS, StopCodon, UTR3]);
         assert_eq!(get_coords_by_feature(fxs, Exon),
                    vec![(100, 300), (400, 500), (700, 1000)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
-        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 297)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(297, 300)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(297, 300), (400, 500), (700, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+    }
+
+     #[test]
+     fn builder_coords_fwd_coding_from_split() {
+         let tm = TranscriptBuilder::new("chrT", 100, 1000)
+             .strand(Strand::Forward)
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((298, 900)))
+             .build();
+         assert!(tm.is_ok(), "{:?}", tm);
+         let t = tm.unwrap();
+         let fxs = t.features();
+         assert_eq!(get_features(fxs),
+                    vec![Exon, UTR5, StartCodon, CDS, Exon, StartCodon, CDS, Exon, CDS, StopCodon,
+                         UTR3]);
+         assert_eq!(get_coords_by_feature(fxs, Exon),
+                    vec![(100, 300), (400, 500), (700, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 298)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(298, 300), (400, 401)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(298, 300), (400, 500), (700, 900)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+     }
+
+     #[test]
+     fn builder_coords_fwd_coding_to_exon3end() {
+         let tm = TranscriptBuilder::new("chrT", 100, 1000)
+             .strand(Strand::Forward)
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 500)))
+             .build();
+         assert!(tm.is_ok(), "{:?}", tm);
+         let t = tm.unwrap();
+         let fxs = t.features();
+         assert_eq!(get_features(fxs),
+                    vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, Exon, StopCodon, UTR3]);
+         assert_eq!(get_coords_by_feature(fxs, Exon),
+                    vec![(100, 300), (400, 500), (700, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
+     }
+
+     #[test]
+     fn builder_coords_fwd_coding_to_exon5end() {
+         let tm = TranscriptBuilder::new("chrT", 100, 1000)
+             .strand(Strand::Forward)
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 700)))
+             .build();
+         assert!(tm.is_ok(), "{:?}", tm);
+         let t = tm.unwrap();
+         let fxs = t.features();
+         assert_eq!(get_features(fxs),
+                    vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, Exon, StopCodon, UTR3]);
+         assert_eq!(get_coords_by_feature(fxs, Exon),
+                    vec![(100, 300), (400, 500), (700, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
+     }
+
+     #[test]
+     fn builder_coords_fwd_coding_to_split() {
+         let tm = TranscriptBuilder::new("chrT", 100, 1000)
+             .strand(Strand::Forward)
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 499)))
+             .build();
+         assert!(tm.is_ok(), "{:?}", tm);
+         let t = tm.unwrap();
+         let fxs = t.features();
+         assert_eq!(get_features(fxs),
+                    vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, StopCodon, UTR3,
+                         Exon, StopCodon, UTR3]);
+         assert_eq!(get_coords_by_feature(fxs, Exon),
+                    vec![(100, 300), (400, 500), (700, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 499)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(499, 500), (700, 702)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(499, 500), (700, 1000)]);
+     }
+
+    #[test]
+    fn builder_coords_rev() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], None)
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs), vec![Exon, Exon, Exon]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+    }
+
+    #[test]
+    fn builder_coords_rev_coding() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 900)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR3, StopCodon, CDS, Exon, CDS, Exon, CDS, StartCodon, UTR5]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(897, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(900, 1000)]);
+    }
+
+    #[test]
+    fn builder_coords_rev_coding_from_exon3end() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((300, 900)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR3, StopCodon, Exon, CDS, Exon, CDS, StartCodon, UTR5]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(900, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(897, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(297, 300)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300)]);
+    }
+
+    #[test]
+    fn builder_coords_rev_coding_from_exon5end() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((400, 900)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR3, StopCodon, Exon, CDS, Exon, CDS, StartCodon, UTR5]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(900, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(897, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(297, 300)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300)]);
+    }
+
+    #[test]
+    fn builder_coords_rev_coding_to_exon5end() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 700)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR3, StopCodon, CDS, Exon, CDS, StartCodon, Exon, UTR5]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(497, 500)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+    }
+
+    #[test]
+    fn builder_coords_rev_coding_to_near_exon5end() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 703)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR3, StopCodon, CDS, Exon, CDS, Exon, CDS, StartCodon, UTR5]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(703, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(700, 703)]);
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 703)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(703, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+    }
+
+    #[test]
+    fn builder_coords_rev_coding_to_exon3end() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Reverse)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 500)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR3, StopCodon, CDS, Exon, CDS, StartCodon, Exon, UTR5]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(497, 500)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+    }
+
+    #[test]
+    fn builder_coords_coding_unk() {
+        let tm = TranscriptBuilder::new("chrT", 100, 1000)
+            .strand(Strand::Unknown)
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 900)))
+            .build();
+        assert!(tm.is_ok(), "{:?}", tm);
+        let t = tm.unwrap();
+        let fxs = t.features();
+        assert_eq!(get_features(fxs),
+                   vec![Exon, UTR, CDS, Exon, CDS, Exon, CDS, UTR]);
+        assert_eq!(get_coords_by_feature(fxs, Exon),
+                   vec![(100, 300), (400, 500), (700, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 900)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR), vec![(100, 200), (900, 1000)]);
     }
 }
 
@@ -613,7 +925,7 @@ pub struct TranscriptBuilder {
     // Or exon coordinates, possibly coupled with cds coord
     // NOTE: Can we instead of using Vec<_> here keep it as an unconsumed iterator?
     exon_coords: Option<Vec<(u64, u64)>>,
-    orf_coord: Option<(u64, u64)>,
+    coding_coord: Option<(u64, u64)>,
     id: Option<String>,
     attributes: HashMap<String, String>,
 }
@@ -630,7 +942,7 @@ impl TranscriptBuilder {
             strand_char: None,
             features: None,
             exon_coords: None,
-            orf_coord: None,
+            coding_coord: None,
             id: None,
             attributes: HashMap::new(),
         }
@@ -663,12 +975,12 @@ impl TranscriptBuilder {
     pub fn feature_coords<E>(
         mut self,
         exon_coords: E,
-        orf_coord: Option<(u64, u64)>
+        coding_coord: Option<(u64, u64)>
     )-> TranscriptBuilder
         where E: IntoIterator<Item=(u64, u64)>
     {
         self.exon_coords = Some(exon_coords.into_iter().collect());
-        self.orf_coord = orf_coord;
+        self.coding_coord = coding_coord;
         self
     }
 
@@ -677,7 +989,7 @@ impl TranscriptBuilder {
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let features = resolve_transcript_features(
             &self.seq_name, &interval, &strand,
-            self.features, self.exon_coords.as_ref(), self.orf_coord)?;
+            self.features, self.exon_coords.as_ref(), self.coding_coord)?;
 
         let transcript = Transcript {
             seq_name: self.seq_name, interval: interval, strand: strand,
