@@ -5,6 +5,7 @@ extern crate bio;
 use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::iter;
+use std::ops::Deref;
 
 use bio::utils::{self, Interval, IntervalError, Strand};
 use sliding_windows::{IterExt, Storage};
@@ -55,6 +56,8 @@ pub trait Annotation {
     fn attribute(&self, key: &str) -> Option<&str>;
     fn strand(&self) -> &Strand;
     fn id(&self) -> Option<&str>;
+
+    #[inline]
     fn span(&self) -> u64 {
         self.interval().end - self.interval().start
     }
@@ -218,13 +221,40 @@ fn infer_features(
                 }
             };
 
+            // Helper function for backtracking and adding possibly skipped features
+            fn backtrack_and_push<F>(
+                features: &mut Vec<TranscriptFeature>,
+                window: &[Option<(u64, u64)>], codon_rem: &mut u64,
+                tx_feature_kind: TxFeature, feature_maker: &F)
+            where F: Fn(TxFeature, u64, u64) -> TranscriptFeature
+            {
+                let mut backtrack_count = 1;
+                let window_size = window.len();
+                while *codon_rem > 0 && backtrack_count < (window_size-1) {
+                    if let Some(prev) = window[window_size-(backtrack_count+1)] {
+                        let fx = feature_maker(
+                            tx_feature_kind.clone(), max(prev.0, prev.1 - *codon_rem), prev.1);
+                        *codon_rem = *codon_rem - fx.span();
+                        backtrack_count += 1;
+                        features.push(fx);
+                    }
+                };
+                if backtrack_count > 1 {
+                    features.sort_by_key(|fx| fx.interval().start)
+                }
+            }
+
             // TODO: Look at using proper trees instead of these manual steps.
-            let (mut codon1_remaining, mut codon2_remaining) = (3, 3);
+            // 4 is 1 (current block) + possible # of backtracks (3, which is the codon size)
             let window_size = 4;
+            // prepend `window_size-1` None so the block of interest is always at end of the window
             let iter = iter::repeat(None).take(window_size-1)
                 .chain(m_exon_coords.iter().map(|&v| Some(v)));
             let mut window_storage: Storage<Option<(u64, u64)>> =
                 Storage::optimized(&iter, window_size);
+
+            // variables for tracking how much we have consumed the 5' or 3' codon
+            let (mut codon1_rem, mut codon2_rem) = (3, 3);
             for window in iter.sliding_windows(&mut window_storage) {
 
                 let (start, end) = window[window_size-1].unwrap();
@@ -239,26 +269,13 @@ fn infer_features(
                     features.push(make_feature(TxFeature::Exon, start, end));
                     features.push(make_feature(utr1.clone(), start, end));
                     if let &Strand::Reverse = transcript_strand {
-                        let mut codon_remaining = 3;
                         let fx = make_feature(TxFeature::StopCodon,
-                                                max(start, coding_r.0 - codon_remaining),
+                                                max(start, coding_r.0 - codon1_rem),
                                                 coding_r.0);
-                        codon_remaining -= fx.span();
+                        codon1_rem -= fx.span();
                         features.push(fx);
-                        let mut backtrack = 1;
-                        while codon_remaining > 0 && backtrack < (window_size-1) {
-                            if let Some(prev) = window[window_size-(backtrack+1)] {
-                                let fx = make_feature(TxFeature::StopCodon,
-                                                        max(prev.0, prev.1 - codon_remaining),
-                                                        prev.1);
-                                codon_remaining -= fx.span();
-                                backtrack = backtrack + 1;
-                                features.push(fx);
-                            }
-                        };
-                        if backtrack > 1 {
-                            features.sort_by_key(|f| (f.interval().start));
-                        }
+                        backtrack_and_push(&mut features, window.deref(), &mut codon1_rem,
+                                           TxFeature::StopCodon, &make_feature);
                     }
 
                 // UTR-CDS exon block
@@ -270,33 +287,20 @@ fn infer_features(
                         &Strand::Forward => {
                             let fx = make_feature(TxFeature::StartCodon,
                                                   coding_r.0,
-                                                  min(coding_r.0 + codon1_remaining, end));
-                            codon1_remaining -= fx.span();
+                                                  min(coding_r.0 + codon1_rem, end));
+                            codon1_rem -= fx.span();
                             features.push(fx);
                         },
                         &Strand::Reverse => {
                             // most complex case: stop codon split over 3 previous 1-bp exons
                             // biologically unexpected but technically possible
-                            let mut codon_remaining = 3;
                             let fx = make_feature(TxFeature::StopCodon,
-                                                  max(start, coding_r.0 - codon_remaining),
+                                                  max(start, coding_r.0 - codon1_rem),
                                                   coding_r.0);
-                            codon_remaining -= fx.span();
+                            codon1_rem -= fx.span();
                             features.push(fx);
-                            let mut backtrack = 1;
-                            while codon_remaining > 0 && backtrack < (window_size-1) {
-                                if let Some(prev) = window[window_size-(backtrack+1)] {
-                                    let fx = make_feature(TxFeature::StopCodon,
-                                                          max(prev.0, prev.1 - codon_remaining),
-                                                          prev.1);
-                                    codon_remaining -= fx.span();
-                                    backtrack = backtrack + 1;
-                                    features.push(fx);
-                                }
-                            };
-                            if backtrack > 1 {
-                                features.sort_by_key(|f| (f.interval().start));
-                            }
+                            backtrack_and_push(&mut features, window.deref(), &mut codon1_rem,
+                                               TxFeature::StopCodon, &make_feature);
                         },
                         &Strand::Unknown => {},
                     }
@@ -306,7 +310,7 @@ fn infer_features(
                 } else if end < coding_r.1 {
                     features.push(make_feature(TxFeature::Exon, start, end));
 
-                    if codon1_remaining > 0 {
+                    if codon1_rem > 0 {
                         match transcript_strand {
                             &Strand::Forward => {
                                 // Ensure the start codon coordinate is not in an intron
@@ -318,27 +322,14 @@ fn infer_features(
                                 }
 
                                 let fx = make_feature(TxFeature::StartCodon,
-                                                    start,
-                                                    min(start + codon1_remaining, end));
-                                codon1_remaining -= fx.span();
+                                                      start,
+                                                      min(start + codon1_rem, end));
+                                codon1_rem -= fx.span();
                                 features.push(fx);
                             },
                             &Strand::Reverse if start == coding_r.0 => {
-                                let mut codon_remaining = codon1_remaining;
-                                let mut backtrack = 1;
-                                while codon_remaining > 0 && backtrack < (window_size-1) {
-                                    if let Some(prev) = window[window_size-(backtrack+1)] {
-                                        let fx = make_feature(TxFeature::StopCodon,
-                                                              max(prev.0, prev.1 - codon_remaining),
-                                                              prev.1);
-                                        codon_remaining -= fx.span();
-                                        backtrack = backtrack + 1;
-                                        features.push(fx);
-                                    }
-                                };
-                                if backtrack > 1 {
-                                    features.sort_by_key(|f| (f.interval().start));
-                                }
+                                backtrack_and_push(&mut features, window.deref(), &mut codon1_rem,
+                                                   TxFeature::StopCodon, &make_feature);
                             },
                             _ => {},
                         }
@@ -352,24 +343,12 @@ fn infer_features(
 
                     if let &Strand::Reverse = transcript_strand {
                         let fx = make_feature(TxFeature::StartCodon,
-                                              max(start, coding_r.1 - codon2_remaining),
+                                              max(start, coding_r.1 - codon2_rem),
                                               coding_r.1);
-                        codon2_remaining -= fx.span();
+                        codon2_rem -= fx.span();
                         features.push(fx);
-                        let mut backtrack = 1;
-                        while codon2_remaining > 0 && backtrack < (window_size-1) {
-                            if let Some(prev) = window[window_size-(backtrack+1)] {
-                                let fx = make_feature(TxFeature::StartCodon,
-                                                      max(prev.0, prev.1 - codon2_remaining),
-                                                      prev.1);
-                                codon2_remaining -= fx.span();
-                                backtrack = backtrack + 1;
-                                features.push(fx);
-                            }
-                        };
-                        if backtrack > 1 {
-                            features.sort_by_key(|f| (f.interval().start));
-                        }
+                        backtrack_and_push(&mut features, window.deref(), &mut codon2_rem,
+                                           TxFeature::StartCodon, &make_feature);
                     }
 
                 // CDS-UTR exon block
@@ -381,31 +360,18 @@ fn infer_features(
                         &Strand::Forward => {
                             let fx = make_feature(TxFeature::StopCodon,
                                                   coding_r.1,
-                                                  min(coding_r.1 + codon2_remaining, end));
-                            codon2_remaining -= fx.span();
+                                                  min(coding_r.1 + codon2_rem, end));
+                            codon2_rem -= fx.span();
                             features.push(fx);
                         },
                         &Strand::Reverse => {
-                            let mut codon_remaining = 3;
                             let fx = make_feature(TxFeature::StartCodon,
-                                                  max(start, coding_r.1 - codon_remaining),
+                                                  max(start, coding_r.1 - codon2_rem),
                                                   coding_r.1);
-                            codon_remaining -= fx.span();
+                            codon2_rem -= fx.span();
                             features.push(fx);
-                            let mut backtrack = 1;
-                            while codon_remaining > 0 && backtrack < (window_size-1) {
-                                if let Some(prev) = window[window_size-(backtrack+1)] {
-                                    let fx = make_feature(TxFeature::StartCodon,
-                                                          max(prev.0, prev.1 - codon_remaining),
-                                                          prev.1);
-                                    codon_remaining -= fx.span();
-                                    backtrack = backtrack + 1;
-                                    features.push(fx);
-                                }
-                            };
-                            if backtrack > 1 {
-                                features.sort_by_key(|f| (f.interval().start));
-                            }
+                            backtrack_and_push(&mut features, window.deref(), &mut codon2_rem,
+                                               TxFeature::StartCodon, &make_feature);
                         },
                         &Strand::Unknown => {},
                     }
@@ -414,31 +380,18 @@ fn infer_features(
                 // Whole UTR exon blocks
                 } else {
                     features.push(make_feature(TxFeature::Exon, start, end));
-                    if codon2_remaining > 0 {
+                    if codon2_rem > 0 {
                         match transcript_strand {
                             &Strand::Forward => {
                                 let fx = make_feature(TxFeature::StopCodon,
                                                     start,
-                                                    min(start + codon2_remaining, end));
-                                codon2_remaining -= fx.span();
+                                                    min(start + codon2_rem, end));
+                                codon2_rem -= fx.span();
                                 features.push(fx);
                             },
-                            &Strand::Reverse => {
-                                let mut backtrack = 1;
-                                while codon2_remaining > 0 && backtrack < (window_size-1) {
-                                    if let Some(prev) = window[window_size-(backtrack+1)] {
-                                        let fx = make_feature(TxFeature::StartCodon,
-                                                              max(prev.0, prev.1 - codon2_remaining),
-                                                              prev.1);
-                                        codon2_remaining -= fx.span();
-                                        backtrack = backtrack + 1;
-                                        features.push(fx);
-                                    }
-                                };
-                                if backtrack > 1 {
-                                    features.sort_by_key(|f| (f.interval().start));
-                                }
-                            },
+                            &Strand::Reverse => backtrack_and_push(
+                                &mut features, window.deref(), &mut codon2_rem,
+                                TxFeature::StartCodon, &make_feature),
                             _ => {},
                         }
                     }
