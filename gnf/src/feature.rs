@@ -187,6 +187,22 @@ where F: Fn(TxFeature, u64, u64) -> TranscriptFeature
     }
 }
 
+#[inline]
+fn assign_frame(feature: &mut TranscriptFeature,
+                cur_sc_frame: &mut u64, cur_cds_frame: &mut u64) {
+    match feature.kind() {
+        &TxFeature::StartCodon => {
+            feature.frame = Some(*cur_sc_frame);
+            *cur_sc_frame = (3 - ((feature.span() - *cur_sc_frame) % 3)) % 3;
+        },
+        &TxFeature::CDS => {
+            feature.frame = Some(*cur_cds_frame);
+            *cur_cds_frame = (3 - ((feature.span() - *cur_cds_frame) % 3)) % 3;
+        },
+        _ => {},
+    }
+}
+
 fn infer_features(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
@@ -245,6 +261,7 @@ fn infer_features(
                     strand: *transcript_strand,
                     attributes: HashMap::new(),
                     id: None,
+                    frame: None,
                 }
             };
 
@@ -257,8 +274,9 @@ fn infer_features(
             let mut window_storage: Storage<Option<(u64, u64)>> =
                 Storage::optimized(&iter, window_size);
 
-            // variables for tracking how much we have consumed the 5' or 3' codon
+            // how much we have consumed the 5' or 3' codon
             let (mut codon1_rem, mut codon2_rem) = (3, 3);
+
             for window in iter.sliding_windows(&mut window_storage) {
 
                 let (start, end) = window[window_size-1].unwrap();
@@ -403,6 +421,21 @@ fn infer_features(
                 }
             }
 
+            let (mut sc_frame, mut cds_frame) = (0, 0);
+            match transcript_strand {
+                &Strand::Forward => {
+                    for coding_fx in features.iter_mut() {
+                        assign_frame(coding_fx, &mut sc_frame, &mut cds_frame);
+                    }
+                },
+                &Strand::Reverse => {
+                    for coding_fx in features.iter_mut().rev() {
+                        assign_frame(coding_fx, &mut sc_frame, &mut cds_frame);
+                    }
+                }
+                _ => {}
+            }
+
             Ok(features)
         },
 
@@ -421,6 +454,7 @@ fn infer_features(
                         strand: *transcript_strand,
                         id: None,
                         attributes: HashMap::new(),
+                        frame: None,
                     });
             }
             Ok(features)
@@ -442,6 +476,16 @@ mod test_transcript {
 
     fn get_features(fxs: &Vec<TranscriptFeature>) -> Vec<TxFeature> {
         fxs.iter().map(|fx| fx.kind().clone()).collect()
+    }
+
+    fn get_framed_features(fxs: &Vec<TranscriptFeature>) -> Vec<(TxFeature, u64)> {
+        fxs.iter().filter_map(|fx| {
+            match (fx.frame(), fx.kind()) {
+                (Some(frame), fxk @ &TxFeature::StartCodon) => Some((fxk.clone(), *frame)),
+                (Some(frame), fxk @ &TxFeature::CDS) => Some((fxk.clone(), *frame)),
+                _ => None,
+            }
+        }).collect()
     }
 
     #[test]
@@ -476,6 +520,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 800)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(800, 803)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(800, 1000)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(StartCodon, 0), (CDS, 0), (CDS, 2), (CDS, 1)]);
     }
 
     #[test]
@@ -496,6 +542,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(StartCodon, 0), (CDS, 0), (CDS, 2)]);
     }
 
     #[test]
@@ -516,6 +564,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(StartCodon, 0), (CDS, 0), (CDS, 2)]);
     }
 
     #[test]
@@ -536,6 +586,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(297, 300), (400, 500), (700, 800)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(800, 803)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(800, 1000)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(StartCodon, 0), (CDS, 0), (CDS, 0), (CDS, 2)]);
     }
 
      #[test]
@@ -557,6 +609,9 @@ mod test_transcript {
          assert_eq!(get_coords_by_feature(fxs, CDS), vec![(298, 300), (400, 500), (700, 901)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(901, 904)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(901, 1000)]);
+         assert_eq!(get_framed_features(fxs),
+                    vec![(StartCodon, 0), (CDS, 0),
+                         (StartCodon, 1), (CDS, 1), (CDS, 0)]);
      }
 
      #[test]
@@ -577,6 +632,8 @@ mod test_transcript {
          assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
+         assert_eq!(get_framed_features(fxs),
+                    vec![(StartCodon, 0), (CDS, 0), (CDS, 1)]);
      }
 
      #[test]
@@ -597,6 +654,8 @@ mod test_transcript {
          assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
+         assert_eq!(get_framed_features(fxs),
+                    vec![(StartCodon, 0), (CDS, 0), (CDS, 1)]);
      }
 
      #[test]
@@ -618,6 +677,8 @@ mod test_transcript {
          assert_eq!(get_coords_by_feature(fxs, CDS), vec![(199, 300), (400, 499)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(499, 500), (700, 702)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(499, 500), (700, 1000)]);
+         assert_eq!(get_framed_features(fxs),
+                    vec![(StartCodon, 0), (CDS, 0), (CDS, 1)]);
      }
 
     #[test]
@@ -652,6 +713,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 800)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(797, 800)]);
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(800, 1000)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(CDS, 1), (CDS, 2), (CDS, 0), (StartCodon, 0)]);
     }
 
     #[test]
@@ -672,6 +735,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(297, 300)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(CDS, 1), (CDS, 0), (StartCodon, 0)]);
     }
 
     #[test]
@@ -692,6 +757,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(400, 500), (700, 900)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(297, 300)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(CDS, 1), (CDS, 0), (StartCodon, 0)]);
     }
 
      #[test]
@@ -713,6 +780,8 @@ mod test_transcript {
          assert_eq!(get_coords_by_feature(fxs, CDS), vec![(401, 500), (700, 901)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(298, 300), (400, 401)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300), (400, 401)]);
+         assert_eq!(get_framed_features(fxs),
+                    vec![(CDS, 0), (CDS, 0), (StartCodon, 0)]);
      }
 
     #[test]
@@ -733,6 +802,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(187, 190)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 190)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(CDS, 2), (CDS, 0), (StartCodon, 0)]);
     }
 
     #[test]
@@ -753,6 +824,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 703)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(CDS, 2), (CDS, 0), (CDS, 0), (StartCodon, 0)]);
     }
 
     #[test]
@@ -773,6 +846,8 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(187, 190)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 190)]);
+        assert_eq!(get_framed_features(fxs),
+                   vec![(CDS, 2), (CDS, 0), (StartCodon, 0)]);
     }
 
      #[test]
@@ -794,6 +869,8 @@ mod test_transcript {
          assert_eq!(get_coords_by_feature(fxs, CDS), vec![(199, 300), (400, 500), (700, 702)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(196, 199)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 199)]);
+         assert_eq!(get_framed_features(fxs),
+                    vec![(CDS, 0), (CDS, 1), (StartCodon, 1), (CDS, 0), (StartCodon, 0)]);
      }
 
     #[test]
@@ -811,6 +888,7 @@ mod test_transcript {
                    vec![(100, 300), (400, 500), (700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 800)]);
         assert_eq!(get_coords_by_feature(fxs, UTR), vec![(100, 200), (800, 1000)]);
+        assert_eq!(get_framed_features(fxs).len(), 0);
     }
 }
 
@@ -818,6 +896,7 @@ mod test_transcript {
 pub struct TranscriptFeature {
     kind: TxFeature,
     seq_name: String,
+    frame: Option<u64>,
     interval: Interval<u64>,
     strand: Strand,
     id: Option<String>,
@@ -831,6 +910,10 @@ impl TranscriptFeature {
     pub fn kind(&self) -> &TxFeature {
         &self.kind
     }
+
+    pub fn frame(&self) -> Option<&u64> {
+        self.frame.as_ref()
+    }
 }
 
 pub struct TxFeatureBuilder {
@@ -842,6 +925,7 @@ pub struct TxFeatureBuilder {
     strand: Option<Strand>,
     strand_char: Option<char>,
     id: Option<String>,
+    frame: Option<u64>,
 }
 
 impl TxFeatureBuilder {
@@ -857,6 +941,7 @@ impl TxFeatureBuilder {
             strand: None,
             strand_char: None,
             id: None,
+            frame: None,
         }
     }
 
@@ -884,12 +969,18 @@ impl TxFeatureBuilder {
         self
     }
 
+    pub fn frame(mut self, frame: u64) -> TxFeatureBuilder {
+        self.frame = Some(frame);
+        self
+    }
+
     pub fn build(self) -> Result<TranscriptFeature, FeatureError> {
         let interval = coords_to_interval(self.start, self.end)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let feature = TranscriptFeature {
             seq_name: self.seq_name, kind: self.kind, interval: interval,
             strand: strand, attributes: self.attributes, id: self.id,
+            frame: self.frame,
         };
         Ok(feature)
     }
