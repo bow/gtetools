@@ -160,6 +160,33 @@ fn resolve_transcript_features(
     }
 }
 
+// Helper function for backtracking and adding possibly skipped features
+fn backtrack_and_push<F>(
+    features: &mut Vec<TranscriptFeature>,
+    tx_feature_kind: TxFeature,
+    window: &[Option<(u64, u64)>],
+    codon_rem: &mut u64,
+    feature_maker: &F)
+where F: Fn(TxFeature, u64, u64) -> TranscriptFeature
+{
+    let mut backtrack_count = 1;
+    let window_size = window.len();
+    while *codon_rem > 0 && backtrack_count < (window_size-1) {
+        // Get the nth previous item, if it exists
+        if let Some(prev) = window[window_size-(backtrack_count+1)] {
+            let fx = feature_maker(tx_feature_kind.clone(),
+                                   max(prev.0, prev.1 - *codon_rem), prev.1);
+            *codon_rem = *codon_rem - fx.span();
+            backtrack_count += 1;
+            features.push(fx);
+        }
+    };
+    // Ensure the features vec is sorted if any backtrack was done
+    if backtrack_count > 1 {
+        features.sort_by_key(|fx| fx.interval().start)
+    }
+}
+
 fn infer_features(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
@@ -221,29 +248,6 @@ fn infer_features(
                 }
             };
 
-            // Helper function for backtracking and adding possibly skipped features
-            fn backtrack_and_push<F>(
-                features: &mut Vec<TranscriptFeature>,
-                window: &[Option<(u64, u64)>], codon_rem: &mut u64,
-                tx_feature_kind: TxFeature, feature_maker: &F)
-            where F: Fn(TxFeature, u64, u64) -> TranscriptFeature
-            {
-                let mut backtrack_count = 1;
-                let window_size = window.len();
-                while *codon_rem > 0 && backtrack_count < (window_size-1) {
-                    if let Some(prev) = window[window_size-(backtrack_count+1)] {
-                        let fx = feature_maker(
-                            tx_feature_kind.clone(), max(prev.0, prev.1 - *codon_rem), prev.1);
-                        *codon_rem = *codon_rem - fx.span();
-                        backtrack_count += 1;
-                        features.push(fx);
-                    }
-                };
-                if backtrack_count > 1 {
-                    features.sort_by_key(|fx| fx.interval().start)
-                }
-            }
-
             // TODO: Look at using proper trees instead of these manual steps.
             // 4 is 1 (current block) + possible # of backtracks (3, which is the codon size)
             let window_size = 4;
@@ -274,8 +278,8 @@ fn infer_features(
                                                 coding_r.0);
                         codon1_rem -= fx.span();
                         features.push(fx);
-                        backtrack_and_push(&mut features, window.deref(), &mut codon1_rem,
-                                           TxFeature::StopCodon, &make_feature);
+                        backtrack_and_push(&mut features, TxFeature::StopCodon,
+                                           window.deref(), &mut codon1_rem, &make_feature);
                     }
 
                 // UTR-CDS exon block
@@ -299,8 +303,8 @@ fn infer_features(
                                                   coding_r.0);
                             codon1_rem -= fx.span();
                             features.push(fx);
-                            backtrack_and_push(&mut features, window.deref(), &mut codon1_rem,
-                                               TxFeature::StopCodon, &make_feature);
+                            backtrack_and_push(&mut features, TxFeature::StopCodon,
+                                               window.deref(), &mut codon1_rem, &make_feature);
                         },
                         &Strand::Unknown => {},
                     }
@@ -328,8 +332,8 @@ fn infer_features(
                                 features.push(fx);
                             },
                             &Strand::Reverse if start == coding_r.0 => {
-                                backtrack_and_push(&mut features, window.deref(), &mut codon1_rem,
-                                                   TxFeature::StopCodon, &make_feature);
+                                backtrack_and_push(&mut features, TxFeature::StopCodon,
+                                                   window.deref(), &mut codon1_rem, &make_feature);
                             },
                             _ => {},
                         }
@@ -347,8 +351,8 @@ fn infer_features(
                                               coding_r.1);
                         codon2_rem -= fx.span();
                         features.push(fx);
-                        backtrack_and_push(&mut features, window.deref(), &mut codon2_rem,
-                                           TxFeature::StartCodon, &make_feature);
+                        backtrack_and_push(&mut features, TxFeature::StartCodon,
+                                           window.deref(), &mut codon2_rem, &make_feature);
                     }
 
                 // CDS-UTR exon block
@@ -370,8 +374,8 @@ fn infer_features(
                                                   coding_r.1);
                             codon2_rem -= fx.span();
                             features.push(fx);
-                            backtrack_and_push(&mut features, window.deref(), &mut codon2_rem,
-                                               TxFeature::StartCodon, &make_feature);
+                            backtrack_and_push(&mut features, TxFeature::StartCodon,
+                                               window.deref(), &mut codon2_rem, &make_feature);
                         },
                         &Strand::Unknown => {},
                     }
@@ -390,8 +394,8 @@ fn infer_features(
                                 features.push(fx);
                             },
                             &Strand::Reverse => backtrack_and_push(
-                                &mut features, window.deref(), &mut codon2_rem,
-                                TxFeature::StartCodon, &make_feature),
+                                &mut features, TxFeature::StartCodon,
+                                window.deref(), &mut codon2_rem, &make_feature),
                             _ => {},
                         }
                     }
