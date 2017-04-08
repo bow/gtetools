@@ -462,7 +462,7 @@ mod test_transcript {
     fn builder_coords_fwd_coding() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 900)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 800)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -473,9 +473,9 @@ mod test_transcript {
                    vec![(100, 300), (400, 500), (700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 800)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(800, 803)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(800, 1000)]);
     }
 
     #[test]
@@ -522,7 +522,7 @@ mod test_transcript {
     fn builder_coords_fwd_coding_from_near_exon3end() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Forward)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((297, 900)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((297, 800)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -533,16 +533,16 @@ mod test_transcript {
                    vec![(100, 300), (400, 500), (700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 297)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(297, 300)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(297, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(297, 300), (400, 500), (700, 800)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(800, 803)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(800, 1000)]);
     }
 
      #[test]
      fn builder_coords_fwd_coding_from_split() {
          let tm = TranscriptBuilder::new("chrT", 100, 1000)
              .strand(Strand::Forward)
-             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((298, 900)))
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((298, 901)))
              .build();
          assert!(tm.is_ok(), "{:?}", tm);
          let t = tm.unwrap();
@@ -554,16 +554,16 @@ mod test_transcript {
                     vec![(100, 300), (400, 500), (700, 1000)]);
          assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 298)]);
          assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(298, 300), (400, 401)]);
-         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(298, 300), (400, 500), (700, 900)]);
-         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(900, 903)]);
-         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(900, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(298, 300), (400, 500), (700, 901)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(901, 904)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(901, 1000)]);
      }
 
      #[test]
      fn builder_coords_fwd_coding_to_exon3end() {
          let tm = TranscriptBuilder::new("chrT", 100, 1000)
              .strand(Strand::Forward)
-             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 500)))
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((190, 500)))
              .build();
          assert!(tm.is_ok(), "{:?}", tm);
          let t = tm.unwrap();
@@ -572,9 +572,9 @@ mod test_transcript {
                     vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, Exon, StopCodon, UTR3]);
          assert_eq!(get_coords_by_feature(fxs, Exon),
                     vec![(100, 300), (400, 500), (700, 1000)]);
-         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
-         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
-         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 190)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(190, 193)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
      }
@@ -583,7 +583,7 @@ mod test_transcript {
      fn builder_coords_fwd_coding_to_exon5end() {
          let tm = TranscriptBuilder::new("chrT", 100, 1000)
              .strand(Strand::Forward)
-             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 700)))
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((190, 700)))
              .build();
          assert!(tm.is_ok(), "{:?}", tm);
          let t = tm.unwrap();
@@ -592,9 +592,9 @@ mod test_transcript {
                     vec![Exon, UTR5, StartCodon, CDS, Exon, CDS, Exon, StopCodon, UTR3]);
          assert_eq!(get_coords_by_feature(fxs, Exon),
                     vec![(100, 300), (400, 500), (700, 1000)]);
-         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
-         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
-         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 190)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(190, 193)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(700, 703)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(700, 1000)]);
      }
@@ -603,7 +603,7 @@ mod test_transcript {
      fn builder_coords_fwd_coding_to_split() {
          let tm = TranscriptBuilder::new("chrT", 100, 1000)
              .strand(Strand::Forward)
-             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 499)))
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((199, 499)))
              .build();
          assert!(tm.is_ok(), "{:?}", tm);
          let t = tm.unwrap();
@@ -613,9 +613,9 @@ mod test_transcript {
                          Exon, StopCodon, UTR3]);
          assert_eq!(get_coords_by_feature(fxs, Exon),
                     vec![(100, 300), (400, 500), (700, 1000)]);
-         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 200)]);
-         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(200, 203)]);
-         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 499)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(100, 199)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(199, 202)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(199, 300), (400, 499)]);
          assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(499, 500), (700, 702)]);
          assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(499, 500), (700, 1000)]);
      }
@@ -638,7 +638,7 @@ mod test_transcript {
     fn builder_coords_rev_coding() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Reverse)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 900)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 800)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -649,9 +649,9 @@ mod test_transcript {
                    vec![(100, 300), (400, 500), (700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(897, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(900, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 800)]);
+        assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(797, 800)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(800, 1000)]);
     }
 
     #[test]
@@ -694,11 +694,32 @@ mod test_transcript {
         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300)]);
     }
 
+     #[test]
+     fn builder_coords_rev_coding_from_split() {
+         let tm = TranscriptBuilder::new("chrT", 100, 1000)
+             .strand(Strand::Reverse)
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((401, 901)))
+             .build();
+         assert!(tm.is_ok(), "{:?}", tm);
+         let t = tm.unwrap();
+         let fxs = t.features();
+         assert_eq!(get_features(fxs),
+                    vec![Exon, UTR3, StopCodon, Exon, UTR3, StopCodon, CDS, Exon, CDS,
+                         StartCodon, UTR5]);
+         assert_eq!(get_coords_by_feature(fxs, Exon),
+                    vec![(100, 300), (400, 500), (700, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(901, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(898, 901)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(401, 500), (700, 901)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(298, 300), (400, 401)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 300), (400, 401)]);
+     }
+
     #[test]
     fn builder_coords_rev_coding_to_exon5end() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Reverse)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 700)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((190, 700)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -709,9 +730,9 @@ mod test_transcript {
                    vec![(100, 300), (400, 500), (700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(497, 500)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(187, 190)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 190)]);
     }
 
     #[test]
@@ -738,7 +759,7 @@ mod test_transcript {
     fn builder_coords_rev_coding_to_exon3end() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Reverse)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 500)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((190, 500)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -749,16 +770,37 @@ mod test_transcript {
                    vec![(100, 300), (400, 500), (700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(700, 1000)]);
         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(497, 500)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500)]);
-        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(197, 200)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 200)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(190, 300), (400, 500)]);
+        assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(187, 190)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 190)]);
     }
+
+     #[test]
+     fn builder_coords_rev_coding_to_split() {
+         let tm = TranscriptBuilder::new("chrT", 100, 1000)
+             .strand(Strand::Reverse)
+             .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((199, 702)))
+             .build();
+         assert!(tm.is_ok(), "{:?}", tm);
+         let t = tm.unwrap();
+         let fxs = t.features();
+         assert_eq!(get_features(fxs),
+                    vec![Exon, UTR3, StopCodon, CDS, Exon, CDS, StartCodon,
+                         Exon, CDS, StartCodon, UTR5]);
+         assert_eq!(get_coords_by_feature(fxs, Exon),
+                    vec![(100, 300), (400, 500), (700, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR5), vec![(702, 1000)]);
+         assert_eq!(get_coords_by_feature(fxs, StartCodon), vec![(499, 500), (700, 702)]);
+         assert_eq!(get_coords_by_feature(fxs, CDS), vec![(199, 300), (400, 500), (700, 702)]);
+         assert_eq!(get_coords_by_feature(fxs, StopCodon), vec![(196, 199)]);
+         assert_eq!(get_coords_by_feature(fxs, UTR3), vec![(100, 199)]);
+     }
 
     #[test]
     fn builder_coords_coding_unk() {
         let tm = TranscriptBuilder::new("chrT", 100, 1000)
             .strand(Strand::Unknown)
-            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 900)))
+            .feature_coords(vec![(100, 300), (400, 500), (700, 1000)], Some((200, 800)))
             .build();
         assert!(tm.is_ok(), "{:?}", tm);
         let t = tm.unwrap();
@@ -767,8 +809,8 @@ mod test_transcript {
                    vec![Exon, UTR, CDS, Exon, CDS, Exon, CDS, UTR]);
         assert_eq!(get_coords_by_feature(fxs, Exon),
                    vec![(100, 300), (400, 500), (700, 1000)]);
-        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 900)]);
-        assert_eq!(get_coords_by_feature(fxs, UTR), vec![(100, 200), (900, 1000)]);
+        assert_eq!(get_coords_by_feature(fxs, CDS), vec![(200, 300), (400, 500), (700, 800)]);
+        assert_eq!(get_coords_by_feature(fxs, UTR), vec![(100, 200), (800, 1000)]);
     }
 }
 
