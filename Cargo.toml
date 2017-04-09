@@ -11,3 +11,6 @@ features = ["suggestions", "wrap_help"]
 [[bin]]
 name = "gnftools"
 path = "src/main.rs"
+
+[workspace]
+members = ["gnf"]
