@@ -408,19 +408,28 @@ where F: Fn(TranscriptFeatureKind, u64, u64) -> TranscriptFeature
     }
 }
 
-#[inline]
-fn assign_frame(feature: &mut TranscriptFeature,
-                cur_sc_frame: &mut u64, cur_cds_frame: &mut u64) {
-    match feature.kind() {
-        &StartCodon => {
-            feature.frame = Some(*cur_sc_frame);
-            *cur_sc_frame = (3 - ((feature.span() - *cur_sc_frame) % 3)) % 3;
-        },
-        &CDS => {
-            feature.frame = Some(*cur_cds_frame);
-            *cur_cds_frame = (3 - ((feature.span() - *cur_cds_frame) % 3)) % 3;
-        },
-        _ => {},
+#[inline(always)]
+// Adapted from: http://mblab.wustl.edu/GTF22.html
+fn calc_next_frame(cur_span: u64, cur_frame: u64) -> u64 {
+    (3 - ((cur_span - cur_frame) % 3)) % 3
+}
+
+fn set_coding_frames<'a, T>(features_miter: T)
+where T: Iterator<Item=&'a mut TranscriptFeature>
+{
+    let (mut sc_frame, mut cds_frame) = (0, 0);
+    for coding_fx in features_miter {
+        match coding_fx.kind() {
+            &StartCodon => {
+                coding_fx.frame = Some(sc_frame);
+                sc_frame = calc_next_frame(coding_fx.span(), sc_frame);
+            },
+            &CDS => {
+                coding_fx.frame = Some(cds_frame);
+                cds_frame = calc_next_frame(coding_fx.span(), cds_frame);
+            },
+            _ => {},
+        }
     }
 }
 
@@ -642,18 +651,9 @@ fn infer_features(
                 }
             }
 
-            let (mut sc_frame, mut cds_frame) = (0, 0);
             match transcript_strand {
-                &Strand::Forward => {
-                    for coding_fx in features.iter_mut() {
-                        assign_frame(coding_fx, &mut sc_frame, &mut cds_frame);
-                    }
-                },
-                &Strand::Reverse => {
-                    for coding_fx in features.iter_mut().rev() {
-                        assign_frame(coding_fx, &mut sc_frame, &mut cds_frame);
-                    }
-                }
+                &Strand::Forward => set_coding_frames(features.iter_mut()),
+                &Strand::Reverse => set_coding_frames(features.iter_mut().rev()),
                 _ => {}
             }
 
