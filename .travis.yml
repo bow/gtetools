@@ -1,0 +1,19 @@
+language: rust
+
+rust:
+  - 1.16.0
+  - stable
+  - beta
+  - nightly
+
+script:
+  - cargo build --verbose --all
+  - cargo test --verbose --all
+  - if [ "$TRAVIS_RUST_VERSION" = "nightly" ]; then
+      cargo bench -p gnf;
+    fi
+
+matrix:
+  allow_failures:
+    - rust: nightly
+    - rust: beta
