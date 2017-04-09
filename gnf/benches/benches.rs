@@ -5,7 +5,7 @@ extern crate gnf;
 extern crate bio;
 
 use bio::utils::Strand;
-use gnf::feature::TranscriptBuilder;
+use gnf::TBuilder;
 use test::Bencher;
 
 
@@ -14,9 +14,9 @@ mod tests {
     use super::*;
 
     #[bench]
-    fn transcript_builder_s_exon_0_cds(b: &mut Bencher) {
+    fn tbuilder_single_exon_no_cds(b: &mut Bencher) {
         b.iter(|| {
-            TranscriptBuilder::new("chrT", 100, 10000)
+            TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
                 .feature_coords(
@@ -26,9 +26,9 @@ mod tests {
     }
 
     #[bench]
-    fn transcript_builder_s_exon_s_cds(b: &mut Bencher) {
+    fn tbuilder_single_exon_single_cds(b: &mut Bencher) {
         b.iter(|| {
-            TranscriptBuilder::new("chrT", 100, 10000)
+            TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
                 .feature_coords(
@@ -38,9 +38,9 @@ mod tests {
     }
 
     #[bench]
-    fn transcript_builder_m_exons_0_cds(b: &mut Bencher) {
+    fn tbuilder_mult_exons_no_cds(b: &mut Bencher) {
         b.iter(|| {
-            TranscriptBuilder::new("chrT", 100, 10000)
+            TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
                 .feature_coords(
@@ -55,9 +55,9 @@ mod tests {
     }
 
     #[bench]
-    fn transcript_builder_m_exons_m_cds(b: &mut Bencher) {
+    fn tbuilder_mult_exons_mult_cds(b: &mut Bencher) {
         b.iter(|| {
-            TranscriptBuilder::new("chrT", 100, 10000)
+            TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
                 .feature_coords(
