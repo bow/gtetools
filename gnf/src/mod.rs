@@ -429,8 +429,7 @@ fn infer_features(
             if !stop_codon_ok {
                 return Err(FeatureError::SubFeatureIntervalError);
             }
-            infer_coding_features(&m_exon_coords, coding_r,
-                                  transcript_interval, &transcript_seqname, transcript_strand)
+            infer_coding_features(&m_exon_coords, coding_r, &transcript_seqname, transcript_strand)
         }
 
         // No CDS intervals mean we just sort the coordinates and create the exons
@@ -464,7 +463,6 @@ const WINDOW_SIZE: usize = 4;
 fn infer_coding_features(
     exon_coords: &Vec<(u64, u64)>,
     coding_r: (u64, u64),
-    transcript_interval: &Interval<u64>,
     transcript_seqname: &String,
     transcript_strand: &Strand)
 -> Result<Vec<TranscriptFeature>, FeatureError> {
@@ -501,7 +499,6 @@ fn infer_coding_features(
     for window in iter.sliding_windows(&mut window_storage) {
 
         let (start, end) = window[WINDOW_SIZE-1].unwrap();
-        let span = end - start;
 
         if start < coding_r.0 {
 
@@ -582,13 +579,13 @@ fn infer_coding_features(
                         features.push(fx);
                     },
                     &Strand::Reverse => {
-                        let fx = feat(StopCodon, start, coding_r.0 - codon1_rem);
+                        let fx = feat(StopCodon, max(start, coding_r.0 - codon2_rem), coding_r.0);
                         codon1_rem -= fx.span();
                         features.push(fx);
                         codon1_rem = backtrack_and_push(
                             &mut features, StopCodon, window.deref(), codon1_rem, &feat);
                         features.push(feat(CDS, coding_r.0, coding_r.1));
-                        let fx = feat(StartCodon, coding_r.1, coding_r.1 - codon2_rem);
+                        let fx = feat(StartCodon, coding_r.1 - codon2_rem, coding_r.1);
                         codon2_rem -= fx.span();
                         features.push(fx);
                     },
@@ -803,9 +800,9 @@ where F: Fn(TranscriptFeatureKind, u64, u64) -> TranscriptFeature
         if let Some(prev) = window[WINDOW_SIZE-(backtrack_count+1)] {
             let fx = feature_maker(tfk.clone(), max(prev.0, prev.1 - codon_rem), prev.1);
             codon_rem -= fx.span();
-            backtrack_count += 1;
             features.push(fx);
         }
+        backtrack_count += 1;
     };
     // Ensure the features vec is sorted if any backtrack was done
     if backtrack_count > 1 {
