@@ -21,24 +21,10 @@ use self::TranscriptFeatureKind::*;
 mod test;
 
 
-pub trait Feature {
-    fn seq_name(&self) -> &str;
-    fn interval(&self) -> &Interval<u64>;
-    fn attributes(&self) -> &HashMap<String, String>;
-    fn attribute(&self, key: &str) -> Option<&str>;
-    fn strand(&self) -> &Strand;
-    fn id(&self) -> Option<&str>;
-
-    #[inline]
-    fn span(&self) -> u64 {
-        self.interval().end - self.interval().start
-    }
-}
-
 macro_rules! impl_feature {
     ($struct_ty:ty) => (
 
-        impl Feature for $struct_ty {
+        impl $struct_ty {
 
             fn seq_name(&self) -> &str {
                 self.seq_name.as_str()
@@ -48,20 +34,13 @@ macro_rules! impl_feature {
                 &self.interval
             }
 
-            fn attributes(&self) -> &HashMap<String, String> {
-                &self.attributes
-            }
-
-            fn attribute(&self, key: &str) -> Option<&str> {
-                self.attributes.get(key).map(|n| n.as_str())
-            }
-
             fn strand(&self) -> &Strand {
                 &self.strand
             }
 
-            fn id(&self) -> Option<&str> {
-                self.id.as_ref().map(|ref n| n.as_str())
+            #[inline]
+            fn span(&self) -> u64 {
+                self.interval().end - self.interval().start
             }
         }
 
@@ -85,8 +64,8 @@ pub struct TranscriptFeature {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
-    id: Option<String>,
-    attributes: HashMap<String, String>,
+    pub id: Option<String>,
+    pub attributes: HashMap<String, String>,
     kind: TranscriptFeatureKind,
     frame: Option<u64>,
 }
@@ -110,8 +89,8 @@ pub struct TFBuilder {
     end: u64,
     strand: Option<Strand>,
     strand_char: Option<char>,
-    id: Option<String>,
-    attributes: HashMap<String, String>,
+    pub id: Option<String>,
+    pub attributes: HashMap<String, String>,
     kind: TranscriptFeatureKind,
     frame: Option<u64>,
 }
@@ -179,8 +158,8 @@ pub struct Transcript {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
-    id: Option<String>,
-    attributes: HashMap<String, String>,
+    pub id: Option<String>,
+    pub attributes: HashMap<String, String>,
     features: Vec<TranscriptFeature>,
 }
 

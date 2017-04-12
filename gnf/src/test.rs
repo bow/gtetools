@@ -13,8 +13,8 @@ fn tfbuilder() {
     assert_eq!(tf.seq_name(), "chrT");
     assert_eq!(tf.kind(), &Exon);
     assert_eq!(tf.strand(), &Strand::Forward);
-    assert_eq!(tf.id(), Some("ex1.1"));
-    assert_eq!(tf.attribute("name"), Some("ex1"));
+    assert_eq!(tf.id, Some("ex1.1".to_owned()));
+    assert_eq!(tf.attributes.get("name"), Some(&"ex1".to_owned()));
     assert_eq!(tf.attributes.len(), 1);
 
     let tfm2 = TFBuilder::new("chrO", 10, 10, Exon)
