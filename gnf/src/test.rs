@@ -76,8 +76,8 @@ fn get_trfks(fxs: &Vec<TranscriptFeature>) -> Vec<TFK> {
 fn get_framed_trfk(fxs: &Vec<TranscriptFeature>) -> Vec<(TFK, u64)> {
     fxs.iter().filter_map(|fx| {
         match (fx.frame(), fx.kind()) {
-            (Some(frame), fxk @ &StartCodon) => Some((fxk.clone(), *frame)),
-            (Some(frame), fxk @ &CDS) => Some((fxk.clone(), *frame)),
+            (Some(frame), fxk @ &StartCodon) => Some((fxk.clone(), frame)),
+            (Some(frame), fxk @ &CDS) => Some((fxk.clone(), frame)),
             _ => None,
         }
     }).collect()

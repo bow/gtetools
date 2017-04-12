@@ -99,8 +99,8 @@ impl TranscriptFeature {
         &self.kind
     }
 
-    pub fn frame(&self) -> Option<&u64> {
-        self.frame.as_ref()
+    pub fn frame(&self) -> Option<u64> {
+        self.frame
     }
 }
 
