@@ -56,6 +56,7 @@ pub enum TranscriptFeatureKind {
     CDS,
     StartCodon,
     StopCodon,
+    Intron,
     Any(String),
 }
 
