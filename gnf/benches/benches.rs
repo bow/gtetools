@@ -19,8 +19,7 @@ mod tests {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .feature_coords(
-                    vec![(100, 10000)], None)
+                .exon_coords(vec![(100, 10000)])
                 .build()
         });
     }
@@ -31,8 +30,8 @@ mod tests {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .feature_coords(
-                    vec![(100, 10000)], Some((200, 9500)))
+                .exon_coords(vec![(100, 10000)])
+                .coding_coord(200, 9500)
                 .build()
         });
     }
@@ -43,13 +42,13 @@ mod tests {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .feature_coords(
+                .exon_coords(
                     vec![
                         (100, 300), (400, 500), (700, 1000),
                         (1100, 1300), (1400, 1500), (1700, 2000),
                         (2100, 2300), (2400, 2500), (2700, 3000),
                         (3000, 6000), (7000, 8000), (9000, 10000),
-                    ], None)
+                    ])
                 .build()
         });
     }
@@ -60,14 +59,14 @@ mod tests {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
                 .id("trx01")
-                .feature_coords(
+                .exon_coords(
                     vec![
                         (100, 300), (400, 500), (700, 1000),
                         (1100, 1300), (1400, 1500), (1700, 2000),
                         (2100, 2300), (2400, 2500), (2700, 3000),
                         (3000, 6000), (7000, 8000), (9000, 10000),
-                    ],
-                    Some((200, 9500)))
+                    ])
+                .coding_coord(200, 9500)
                 .build()
         });
     }
