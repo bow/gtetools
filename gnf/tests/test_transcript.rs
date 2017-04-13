@@ -21,6 +21,25 @@ fn exonf_coords(transcript: &Transcript) -> Vec<Vec<(u64, u64, ExonFeatureKind)>
 }
 
 #[test]
+fn tbuilder_basic() {
+    let btrx = TBuilder::new("chrT", 100, 1000)
+        .strand(Strand::Reverse)
+        .exon_coords(vec![(100, 300), (400, 500), (700, 1000)])
+        .id("transcript-1")
+        .attribute("tag", "basic")
+        .build();
+    assert!(btrx.is_ok(), "{:?}", btrx);
+    let trx = btrx.unwrap();
+    assert_eq!(trx.span(), 900);
+    assert_eq!(trx.seq_name(), "chrT");
+    assert_eq!(trx.strand(), &Strand::Reverse);
+    assert_eq!(trx.id, Some("transcript-1".to_owned()));
+    assert_eq!(trx.attributes.get("tag"), Some(&"basic".to_owned()));
+    assert_eq!(trx.attributes.len(), 1);
+    assert_eq!(trx.exons().len(), 3);
+}
+
+#[test]
 fn tbuilder_coords_fwd() {
     let btrx = TBuilder::new("chrT", 100, 1000)
         .strand(Strand::Forward)
