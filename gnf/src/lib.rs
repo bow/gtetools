@@ -313,7 +313,7 @@ pub mod error {
     quick_error! {
         #[derive(Debug)]
         pub enum FeatureError {
-            IntervalError(err: utils::IntervalError) {
+            InvalidInterval(err: utils::IntervalError) {
                 description(
                     match err {
                         &IntervalError::InvalidRange =>
@@ -322,21 +322,37 @@ pub mod error {
                     })
                 from()
             }
-            StrandCharError(err: utils::StrandError) {
+            InvalidStrandChar(err: utils::StrandError) {
                 description(err.description())
                 from()
             }
-            ConflictingStrandError {
+            ConflictingStrand {
                 description("conflicting strand inputs specified")
             }
-            UnspecifiedStrandError {
+            UnspecifiedStrand {
                 description("strand not specified")
             }
-            SubFeatureIntervalError {
-                description("subfeature interval is not completely enveloped by parent")
+            InvalidExonInterval {
+                description("exon has larger start than end coordinate")
             }
-            IncompleteTranscriptError {
-                description("transcript annotation is incomplete")
+            InvalidCodingInterval {
+                description("coding region has larger start than end coordinate")
+            }
+            UnspecifiedExons {
+                description("transcript is defined without exons")
+            }
+            UnmatchedExons {
+                description("first and/or last exon coordinates do not match transcript \
+                             start and/or end coordinates")
+            }
+            CodingTooLarge {
+                description("coding region leaves no room for stop codon in transcript")
+            }
+            CodingTooSmall {
+                description("coding region leaves no room for start codon")
+            }
+            CodingNotFullyEnveloped {
+                description("coding region not fully enveloped by exons")
             }
         }
     }
@@ -352,7 +368,7 @@ fn resolve_strand_input(
 -> Result<Strand, FeatureError>
 {
     match (strand, strand_char) {
-        (None, None) => Err(FeatureError::UnspecifiedStrandError),
+        (None, None) => Err(FeatureError::UnspecifiedStrand),
         (Some(sv), None) => Ok(sv),
         (None, Some(ref scv)) => Strand::from_char(scv).map_err(FeatureError::from),
         (Some(sv), Some(ref scv)) => {
@@ -360,7 +376,7 @@ fn resolve_strand_input(
             if sv == sv_from_char {
                 Ok(sv)
             } else {
-                Err(FeatureError::ConflictingStrandError)
+                Err(FeatureError::ConflictingStrand)
             }
         }
     }
@@ -384,7 +400,7 @@ fn resolve_exons_input(
         (None, None, None) => Ok(Vec::new()),
 
         // only CDS defined -> must be an error
-        (None, None, Some(_)) => Err(FeatureError::IncompleteTranscriptError),
+        (None, None, Some(_)) => Err(FeatureError::UnspecifiedExons),
 
         // features defined ~ takes precedence over coords (GTF input, since we need
         // to construct the tx features first to store its annotations)
@@ -408,13 +424,13 @@ fn infer_exons(
 {
 
     if exon_coords.len() == 0 {
-        return Err(FeatureError::IncompleteTranscriptError);
+        return Err(FeatureError::UnspecifiedExons);
     }
 
     let mut m_exon_coords = Vec::with_capacity(exon_coords.len());
     for &(a, b) in exon_coords.iter() {
         if a >= b {
-            return Err(FeatureError::SubFeatureIntervalError)
+            return Err(FeatureError::InvalidExonInterval)
         }
         m_exon_coords.push((a, b));
     }
@@ -422,7 +438,7 @@ fn infer_exons(
     let exon_r = (m_exon_coords.first().unwrap().0, m_exon_coords.last().unwrap().1);
 
     if exon_r.0 != transcript_interval.start || exon_r.1 != transcript_interval.end {
-        return Err(FeatureError::SubFeatureIntervalError);
+        return Err(FeatureError::UnmatchedExons);
     }
 
     match coding_coord {
@@ -430,20 +446,21 @@ fn infer_exons(
         Some(coding_r) => {
             // Improper coding region is an error
             if coding_r.0 > coding_r.1 {
-                return Err(FeatureError::SubFeatureIntervalError);
+                return Err(FeatureError::InvalidCodingInterval);
             }
             // Coding coord must be fully enveloped by exon max-min
             if coding_r.0 < exon_r.0 || coding_r.1 > exon_r.1 {
-                return Err(FeatureError::SubFeatureIntervalError);
+                return Err(FeatureError::CodingNotFullyEnveloped);
             }
             // There must be room for stop codons (which is not inclusive in coding_coord)
             let stop_codon_ok = match transcript_strand {
                 &Strand::Forward => coding_r.1 + 3 <= exon_r.1,
                 &Strand::Reverse => coding_r.0 - 3 >= exon_r.0,
-                &Strand::Unknown => true,
+                &Strand::Unknown =>
+                    coding_r.0 - 3 >= exon_r.0 && coding_r.1 + 3 <= exon_r.1,
             };
             if !stop_codon_ok {
-                return Err(FeatureError::SubFeatureIntervalError);
+                return Err(FeatureError::CodingTooLarge);
             }
             infer_exon_features(&m_exon_coords, coding_r, &transcript_seqname, transcript_strand)
         }
@@ -549,7 +566,7 @@ fn infer_exon_features(
             } else if end == coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // a coding region must have at least 3 bases for the start codon
-                    return Err(FeatureError::SubFeatureIntervalError);
+                    return Err(FeatureError::CodingTooSmall);
                 }
                 let mut exon = exn(start, end, vec![feat(start, coding_r.0, utr1.clone())]);
                 match transcript_strand {
@@ -583,7 +600,7 @@ fn infer_exon_features(
             } else if end > coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::SubFeatureIntervalError);
+                    return Err(FeatureError::CodingTooSmall);
                 }
                 let mut exon = exn(start, end, vec![feat(start, coding_r.0, utr1.clone())]);
                 match transcript_strand {
@@ -645,7 +662,7 @@ fn infer_exon_features(
             } else if end == coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::SubFeatureIntervalError);
+                    return Err(FeatureError::CodingTooSmall);
                 }
                 let mut exon = exn(start, end, vec![]);
                 match transcript_strand {
@@ -670,7 +687,7 @@ fn infer_exon_features(
             } else if end > coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::SubFeatureIntervalError);
+                    return Err(FeatureError::CodingTooSmall);
                 }
                 let mut exon = exn(start, end, vec![]);
                 match transcript_strand {
@@ -753,10 +770,6 @@ fn infer_exon_features(
                             let fx = feat(start, min(coding_r.1, start + codon1_rem),
                                           StartCodon { frame: None });
                             codon1_rem -= fx.span();
-                            if codon1_rem > 0 {
-                                // codon1 bases must be exhausted at this point
-                                return Err(FeatureError::SubFeatureIntervalError);
-                            }
                             exon.features.push(fx);
                         }
                         exon.features.push(feat(start, coding_r.1, CDS { frame: None }));

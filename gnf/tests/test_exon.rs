@@ -54,14 +54,14 @@ fn ebuilder_interval_invalid() {
     let exonb = EBuilder::new("chrE", 20, 10).build();
     assert!(exonb.is_err());
     assert!(matches!(exonb.unwrap_err(),
-                     FeatureError::IntervalError(utils::IntervalError::InvalidRange)));
+                     FeatureError::InvalidInterval(utils::IntervalError::InvalidRange)));
 }
 
 #[test]
 fn ebuilder_strand_unspecified() {
     let exonb = EBuilder::new("chrT", 20, 30).build();
     assert!(exonb.is_err());
-    assert!(matches!(exonb.unwrap_err(), FeatureError::UnspecifiedStrandError));
+    assert!(matches!(exonb.unwrap_err(), FeatureError::UnspecifiedStrand));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn ebuilder_strand_char_unexpected() {
         .build();
     assert!(exonb.is_err());
     assert!(matches!(exonb.unwrap_err(),
-                     FeatureError::StrandCharError(utils::StrandError::InvalidChar(_))));
+                     FeatureError::InvalidStrandChar(utils::StrandError::InvalidChar(_))));
 }
 
 #[test]
