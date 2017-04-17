@@ -434,6 +434,7 @@ fn infer_exons(
         }
         m_exon_coords.push((a, b));
     }
+    m_exon_coords.sort();
 
     let exon_r = (m_exon_coords.first().unwrap().0, m_exon_coords.last().unwrap().1);
 
