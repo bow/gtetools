@@ -354,6 +354,9 @@ pub mod error {
             CodingNotFullyEnveloped {
                 description("coding region not fully enveloped by exons")
             }
+            CodingInIntron {
+                description("coding start and/or end lies in introns")
+            }
         }
     }
 }
@@ -452,6 +455,15 @@ fn infer_exons(
             // Coding coord must be fully enveloped by exon max-min
             if coding_r.0 < exon_r.0 || coding_r.1 > exon_r.1 {
                 return Err(FeatureError::CodingNotFullyEnveloped);
+            }
+            // Coding start and end must be in exons
+            let cine = m_exon_coords.iter()
+                .fold((false, false), |acc, c| {
+                    (acc.0 || (c.0 <= coding_r.0 && coding_r.0 <= c.1),
+                     acc.1 || (c.0 <= coding_r.1 && coding_r.1 <= c.1))
+                });
+            if !cine.0 || !cine.1 {
+                return Err(FeatureError::CodingInIntron);
             }
             // There must be room for stop codons (which is not inclusive in coding_coord)
             let stop_codon_ok = match transcript_strand {
