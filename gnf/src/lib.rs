@@ -1,4 +1,5 @@
 extern crate bio;
+extern crate csv;
 #[macro_use]
 extern crate quick_error;
 
@@ -10,6 +11,8 @@ pub use bio::utils::Strand;
 
 use self::error::FeatureError;
 use self::ExonFeatureKind::*;
+
+pub mod io;
 
 
 macro_rules! impl_common {

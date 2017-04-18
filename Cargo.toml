@@ -3,6 +3,9 @@ name = "gnftools"
 version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 
+[dependencies]
+gnf = { path = "gnf", "version" = "~0.1.0" }
+
 [dependencies.clap]
 version = "~2.20.5"
 default-features = false
