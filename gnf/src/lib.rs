@@ -208,6 +208,7 @@ pub struct TBuilder {
     // NOTE: Can we instead of using Vec<_> here keep it as an unconsumed iterator?
     exon_coords: Option<Vec<(u64, u64)>>,
     coding_coord: Option<(u64, u64)>,
+    coding_incl_stop: bool,
 }
 
 impl TBuilder {
@@ -226,6 +227,7 @@ impl TBuilder {
             exons: None,
             exon_coords: None,
             coding_coord: None,
+            coding_incl_stop: false,
         }
     }
 
@@ -275,12 +277,18 @@ impl TBuilder {
         self
     }
 
+    pub fn coding_incl_stop(mut self, incl_stop: bool) -> Self {
+        self.coding_incl_stop = incl_stop;
+        self
+    }
+
     pub fn build(self) -> Result<Transcript, FeatureError> {
         let interval = coords_to_interval(self.start, self.end)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)?;
         let exons = resolve_exons_input(
             &self.seq_name, &interval, &strand,
-            self.exons, self.exon_coords.as_ref(), self.coding_coord)?;
+            self.exons, self.exon_coords.as_ref(), self.coding_coord,
+            self.coding_incl_stop)?;
 
         let transcript = Transcript {
             seq_name: self.seq_name,
@@ -391,7 +399,8 @@ fn resolve_exons_input(
     transcript_strand: &Strand,
     exons: Option<Vec<Exon>>,
     exon_coords: Option<&Vec<(u64, u64)>>,
-    coding_coord: Option<(u64, u64)>
+    coding_coord: Option<(u64, u64)>,
+    coding_incl_stop: bool
 ) -> Result<Vec<Exon>, FeatureError>
 {
     // Deliberately not handling all possible input types to avoid
@@ -413,7 +422,8 @@ fn resolve_exons_input(
         // exon defined & coords possibly defined (refFlat input)
         (None, Some(raw_exon_coords), raw_coding_coord) =>
             infer_exons(transcript_seqname, transcript_interval,
-                        transcript_strand, raw_exon_coords, raw_coding_coord),
+                        transcript_strand, raw_exon_coords, raw_coding_coord,
+                        coding_incl_stop),
     }
 }
 
@@ -422,7 +432,8 @@ fn infer_exons(
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
     exon_coords: &Vec<(u64, u64)>,
-    coding_coord: Option<(u64, u64)>
+    coding_coord: Option<(u64, u64)>,
+    coding_incl_stop: bool
 ) -> Result<Vec<Exon>, FeatureError>
 {
 
@@ -439,17 +450,26 @@ fn infer_exons(
     }
     m_exon_coords.sort();
 
+    let adj_coding_coord =
+        if coding_incl_stop {
+            coding_coord.and_then(|(a, b)| {
+                adjust_coding_coord(a, b, &transcript_strand, &m_exon_coords)
+            })
+        } else {
+            coding_coord
+        };
+
     let exon_r = (m_exon_coords.first().unwrap().0, m_exon_coords.last().unwrap().1);
 
     if exon_r.0 != transcript_interval.start || exon_r.1 != transcript_interval.end {
         return Err(FeatureError::UnmatchedExons);
     }
 
-    match coding_coord {
+    match adj_coding_coord {
 
         Some(coding_r) => {
             // Improper coding region is an error
-            if coding_r.0 > coding_r.1 {
+            if coding_r.0 >= coding_r.1 {
                 return Err(FeatureError::InvalidCodingInterval);
             }
             // Coding coord must be fully enveloped by exon max-min
@@ -495,6 +515,35 @@ fn infer_exons(
             Ok(features)
         }
     }
+}
+
+fn adjust_coding_coord(mut start: u64, mut end: u64,
+                       strand: &Strand, exon_coords: &Vec<(u64, u64)>
+) -> Option<(u64, u64)>
+{
+    let mut codon_rem = 3;
+    match strand {
+        &Strand::Forward => {
+            for &(exon_start, exon_end) in exon_coords.iter().rev() {
+                if end <= exon_end {
+                    let adj_end = max(end - codon_rem, exon_start);
+                    codon_rem -= end - adj_end;
+                    end = adj_end;
+                }
+            }
+        },
+        &Strand::Reverse => {
+            for &(exon_start, exon_end) in exon_coords.iter() {
+                if exon_start <= start {
+                    let adj_start = min(start + codon_rem, exon_end);
+                    codon_rem -= adj_start - start;
+                    start = adj_start;
+                }
+            }
+        },
+        &Strand::Unknown => {},
+    }
+    Some((start, end))
 }
 
 // requirements:
