@@ -23,6 +23,72 @@ use super::error::ParseError;
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
 
+pub struct RefFlatRecord {
+    pub gene_id: String,
+    pub transcript_name: String,
+    pub seq_name: String,
+    pub strand_char: char,
+    pub trx_start: u64,
+    pub trx_end: u64,
+    pub coding_start: u64,
+    pub coding_end: u64,
+    pub num_exons: usize,
+    pub exon_starts: String,
+    pub exon_ends: String,
+}
+
+impl RefFlatRecord {
+    pub fn new(row: RefFlatRow) -> RefFlatRecord {
+        RefFlatRecord {
+            gene_id: row.0,
+            transcript_name: row.1,
+            seq_name: row.2,
+            strand_char: row.3,
+            trx_start: row.4,
+            trx_end: row.5,
+            coding_start: row.6,
+            coding_end: row.7,
+            num_exons: row.8,
+            exon_starts: row.9,
+            exon_ends: row.10,
+        }
+    }
+
+    pub fn to_transcript(self) -> Result<Transcript, ParseError> {
+
+        let exon_coords = self.zip_raw_exon_coords();
+        if exon_coords.len() != self.num_exons {
+            return Err(ParseError::FormatSpecific(
+                "number of exon and exon coordinates mismatch"));
+        }
+
+        let strand = Strand::from_char(&self.strand_char)
+            .map_err(FeatureError::from)
+            .map_err(ParseError::from)?;
+        let mut tb = TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
+            .id(self.transcript_name)
+            .strand(strand)
+            .exon_coords(exon_coords)
+            .coding_incl_stop(true)
+            .attribute("gene_id", self.gene_id);
+
+        if self.coding_start != self.coding_end {
+            tb = tb.coding_coord(self.coding_start, self.coding_end)
+        }
+
+        tb.build().map_err(ParseError::from)
+    }
+
+    #[inline]
+    fn zip_raw_exon_coords(&self) -> Vec<(u64, u64)> {
+        let exon_starts = self.exon_starts
+            .split(',').filter_map(|item| u64::from_str(item).ok());
+        let exon_ends = self.exon_ends
+            .split(',').filter_map(|item| u64::from_str(item).ok());
+        exon_starts.zip(exon_ends).collect()
+    }
+}
+
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>,
 }
@@ -57,50 +123,10 @@ impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
     type Item = Result<Transcript, ParseError>;
 
     fn next(&mut self) -> Option<Result<Transcript, ParseError>> {
-        self.inner.next().map(|row_res| {
-            let row = row_res.map_err(ParseError::from)?;
-            let (gene_id,
-                 transcript_name,
-                 seq_name,
-                 strand_char,
-                 trx_start,
-                 trx_end,
-                 coding_start,
-                 coding_end,
-                 num_exons,
-                 raw_exon_starts,
-                 raw_exon_ends): RefFlatRow = row;
-
-            let exon_coords = zip_raw_exon_coords(raw_exon_starts, raw_exon_ends);
-            if exon_coords.len() != num_exons {
-                return Err(ParseError::FormatSpecific(
-                    "number of exon and exon coordinates mismatch"));
-            }
-
-            let strand = Strand::from_char(&strand_char)
-                .map_err(FeatureError::from)
-                .map_err(ParseError::from)?;
-            let mut tb = TBuilder::new(seq_name, trx_start, trx_end)
-                .id(transcript_name)
-                .strand(strand)
-                .exon_coords(exon_coords)
-                .coding_incl_stop(true)
-                .attribute("gene_id", gene_id);
-
-            if coding_start != coding_end {
-                tb = tb.coding_coord(coding_start, coding_end)
-            }
-
-            tb.build().map_err(ParseError::from)
+        self.inner.next().map(|row| {
+            row.or_else(|err| Err(ParseError::from(err)))
+                .map(RefFlatRecord::new)
+                .and_then(|record| record.to_transcript())
         })
     }
-}
-
-#[inline]
-fn zip_raw_exon_coords(starts: String, ends: String) -> Vec<(u64, u64)> {
-    let exon_starts = starts
-        .split(',').filter_map(|item| u64::from_str(item).ok());
-    let exon_ends = ends
-        .split(',').filter_map(|item| u64::from_str(item).ok());
-    exon_starts.zip(exon_ends).collect()
 }
