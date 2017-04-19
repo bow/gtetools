@@ -1,7 +1,7 @@
 extern crate bio;
-extern crate gnf;
+extern crate genomic_fx;
 
-use gnf::{ExonFeatureKind, Strand, TBuilder, Transcript};
+use genomic_fx::{ExonFeatureKind, Strand, TBuilder, Transcript};
 use ExonFeatureKind::*;
 use Strand::*;
 

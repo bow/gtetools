@@ -1,11 +1,11 @@
 #![feature(test)]
 
 extern crate test;
-extern crate gnf;
+extern crate genomic_fx;
 extern crate bio;
 
 use bio::utils::Strand;
-use gnf::TBuilder;
+use genomic_fx::TBuilder;
 use test::Bencher;
 
 

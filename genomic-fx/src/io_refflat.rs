@@ -16,9 +16,8 @@ use std::str::FromStr;
 
 use csv;
 
-use error::FeatureError;
-use {Strand, Transcript, TBuilder};
-use super::error::ParseError;
+use feature::FeatureError;
+use {Strand, Transcript, TBuilder, Error};
 
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
@@ -54,17 +53,17 @@ impl RefFlatRecord {
         }
     }
 
-    pub fn to_transcript(self) -> Result<Transcript, ParseError> {
+    pub fn to_transcript(self) -> Result<Transcript, Error> {
 
         let exon_coords = self.zip_raw_exon_coords();
         if exon_coords.len() != self.num_exons {
-            return Err(ParseError::FormatSpecific(
+            return Err(Error::RefFlat(
                 "number of exon and exon coordinates mismatch"));
         }
 
         let strand = Strand::from_char(&self.strand_char)
             .map_err(FeatureError::from)
-            .map_err(ParseError::from)?;
+            .map_err(Error::from)?;
         let mut tb = TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
             .id(self.transcript_name)
             .strand(strand)
@@ -76,7 +75,7 @@ impl RefFlatRecord {
             tb = tb.coding_coord(self.coding_start, self.coding_end)
         }
 
-        tb.build().map_err(ParseError::from)
+        tb.build().map_err(Error::from)
     }
 
     #[inline]
@@ -120,11 +119,11 @@ pub struct RefFlatTranscripts<'a, R: 'a> where R: io::Read {
 
 impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
 
-    type Item = Result<Transcript, ParseError>;
+    type Item = Result<Transcript, Error>;
 
-    fn next(&mut self) -> Option<Result<Transcript, ParseError>> {
+    fn next(&mut self) -> Option<Result<Transcript, Error>> {
         self.inner.next().map(|row| {
-            row.or_else(|err| Err(ParseError::from(err)))
+            row.or_else(|err| Err(Error::from(err)))
                 .map(RefFlatRecord::new)
                 .and_then(|record| record.to_transcript())
         })

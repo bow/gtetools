@@ -1,18 +1,11 @@
-extern crate bio;
-extern crate csv;
-#[macro_use]
-extern crate quick_error;
-
 use std::cmp::{max, min};
 use std::collections::HashMap;
 
 use bio::utils::{self, Interval, IntervalError};
-pub use bio::utils::Strand;
+use bio::utils::Strand;
 
-use self::error::FeatureError;
+use Error;
 use self::ExonFeatureKind::*;
-
-pub mod io;
 
 
 macro_rules! impl_common {
@@ -163,9 +156,11 @@ impl EBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Exon, FeatureError> {
-        let interval = coords_to_interval(self.start, self.end)?;
-        let strand = resolve_strand_input(self.strand, self.strand_char)?;
+    pub fn build(self) -> Result<Exon, Error> {
+        let interval = coords_to_interval(self.start, self.end)
+            .map_err(Error::Feature)?;
+        let strand = resolve_strand_input(self.strand, self.strand_char)
+            .map_err(Error::Feature)?;
         let feature = Exon {
             seq_name: self.seq_name,
             interval: interval,
@@ -285,13 +280,15 @@ impl TBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Transcript, FeatureError> {
-        let interval = coords_to_interval(self.start, self.end)?;
-        let strand = resolve_strand_input(self.strand, self.strand_char)?;
+    pub fn build(self) -> Result<Transcript, Error> {
+        let interval = coords_to_interval(self.start, self.end)
+            .map_err(Error::Feature)?;
+        let strand = resolve_strand_input(self.strand, self.strand_char)
+            .map_err(Error::Feature)?;
         let exons = resolve_exons_input(
             &self.seq_name, &interval, &strand,
             self.exons, self.exon_coords.as_ref(), self.coding_coord,
-            self.coding_incl_stop)?;
+            self.coding_incl_stop).map_err(Error::Feature)?;
 
         let transcript = Transcript {
             seq_name: self.seq_name,
@@ -317,57 +314,52 @@ pub struct Gene {
 
 impl_common!(Gene);
 
-pub mod error {
-
-    use super::*;
-
-    quick_error! {
-        #[derive(Debug)]
-        pub enum FeatureError {
-            InvalidInterval(err: utils::IntervalError) {
-                description(
-                    match err {
-                        &IntervalError::InvalidRange =>
-                            "interval start coordinate larger than its end coordinate",
-                        ref otherwise => otherwise.description(),
-                    })
-                from()
-            }
-            InvalidStrandChar(err: utils::StrandError) {
-                description(err.description())
-                from()
-            }
-            ConflictingStrand {
-                description("conflicting strand inputs specified")
-            }
-            UnspecifiedStrand {
-                description("strand not specified")
-            }
-            InvalidExonInterval {
-                description("exon has larger start than end coordinate")
-            }
-            InvalidCodingInterval {
-                description("coding region has larger start than end coordinate")
-            }
-            UnspecifiedExons {
-                description("transcript is defined without exons")
-            }
-            UnmatchedExons {
-                description("first and/or last exon coordinates do not match transcript \
-                             start and/or end coordinates")
-            }
-            CodingTooLarge {
-                description("coding region leaves no room for stop codon in transcript")
-            }
-            CodingTooSmall {
-                description("coding region leaves no room for start codon")
-            }
-            CodingNotFullyEnveloped {
-                description("coding region not fully enveloped by exons")
-            }
-            CodingInIntron {
-                description("coding start and/or end lies in introns")
-            }
+quick_error! {
+    #[derive(Debug)]
+    pub enum FeatureError {
+        InvalidInterval(err: utils::IntervalError) {
+            description(
+                match err {
+                    &IntervalError::InvalidRange =>
+                        "interval start coordinate larger than its end coordinate",
+                    ref otherwise => otherwise.description(),
+                })
+            from()
+        }
+        InvalidStrandChar(err: utils::StrandError) {
+            description(err.description())
+            from()
+        }
+        ConflictingStrand {
+            description("conflicting strand inputs specified")
+        }
+        UnspecifiedStrand {
+            description("strand not specified")
+        }
+        InvalidExonInterval {
+            description("exon has larger start than end coordinate")
+        }
+        InvalidCodingInterval {
+            description("coding region has larger start than end coordinate")
+        }
+        UnspecifiedExons {
+            description("transcript is defined without exons")
+        }
+        UnmatchedExons {
+            description("first and/or last exon coordinates do not match transcript \
+                         start and/or end coordinates")
+        }
+        CodingTooLarge {
+            description("coding region leaves no room for stop codon in transcript")
+        }
+        CodingTooSmall {
+            description("coding region leaves no room for start codon")
+        }
+        CodingNotFullyEnveloped {
+            description("coding region not fully enveloped by exons")
+        }
+        CodingInIntron {
+            description("coding start and/or end lies in introns")
         }
     }
 }
