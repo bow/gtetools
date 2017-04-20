@@ -1,6 +1,8 @@
 extern crate bio;
 extern crate genomic_fx;
 
+use std::collections::HashMap;
+
 use genomic_fx::{ExonFeatureKind, Strand, TBuilder, Transcript};
 use ExonFeatureKind::*;
 use Strand::*;
@@ -40,11 +42,14 @@ where T: IntoIterator<Item=(u64, u64)>
 
 #[test]
 fn tbuilder_basic() {
+    let mut attribs = HashMap::new();
+    attribs.insert("key1".to_owned(), "value1".to_owned());
+    attribs.insert("key2".to_owned(), "value2".to_owned());
     let btrx = TBuilder::new("chrT", 100, 1000)
         .strand(Reverse)
         .exon_coords(vec![(100, 300), (400, 500), (700, 1000)])
+        .attributes(attribs)
         .id("transcript-1")
-        .attribute("tag", "basic")
         .build();
     assert!(btrx.is_ok(), "{:?}", btrx);
     let trx = btrx.unwrap();
@@ -52,6 +57,25 @@ fn tbuilder_basic() {
     assert_eq!(trx.seq_name(), "chrT");
     assert_eq!(trx.strand(), &Strand::Reverse);
     assert_eq!(trx.id, Some("transcript-1".to_owned()));
+    assert_eq!(trx.attributes.get("key1"), Some(&"value1".to_owned()));
+    assert_eq!(trx.attributes.get("key2"), Some(&"value2".to_owned()));
+    assert_eq!(trx.attributes.len(), 2);
+    assert_eq!(trx.exons().len(), 3);
+}
+
+#[test]
+fn tbuilder_alt1() {
+    let btrx = TBuilder::new("chrT", 100, 1000)
+        .strand(Reverse)
+        .exon_coords(vec![(100, 300), (400, 500), (700, 1000)])
+        .attribute("tag", "basic")
+        .build();
+    assert!(btrx.is_ok(), "{:?}", btrx);
+    let trx = btrx.unwrap();
+    assert_eq!(trx.span(), 900);
+    assert_eq!(trx.seq_name(), "chrT");
+    assert_eq!(trx.strand(), &Strand::Reverse);
+    assert_eq!(trx.id, None);
     assert_eq!(trx.attributes.get("tag"), Some(&"basic".to_owned()));
     assert_eq!(trx.attributes.len(), 1);
     assert_eq!(trx.exons().len(), 3);

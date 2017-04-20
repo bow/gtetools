@@ -146,6 +146,11 @@ impl EBuilder {
         self
     }
 
+    pub fn attributes(mut self, attributes: HashMap<String, String>) -> Self {
+        self.attributes = attributes;
+        self
+    }
+
     pub fn feature(mut self, feature: ExonFeature) -> Self {
         self.features.push(feature);
         self
@@ -250,6 +255,11 @@ impl TBuilder {
         where K: Into<String>, V: Into<String>
     {
         self.attributes.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn attributes(mut self, attributes: HashMap<String, String>) -> Self {
+        self.attributes = attributes;
         self
     }
 
