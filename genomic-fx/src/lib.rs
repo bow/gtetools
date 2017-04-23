@@ -14,7 +14,7 @@ pub mod io_refflat;
 pub use feature::{Feature, FeatureError, FeatureKind,
                   EBuilder, Exon, ExonFeature, ExonFeatureKind,
                   TBuilder, Transcript, TranscriptFeature, TranscriptFeatureKind,
-                  Gene, GeneFeature, GeneFeatureKind};
+                  GBuilder, Gene, GeneFeature, GeneFeatureKind};
 
 quick_error! {
     #[derive(Debug)]

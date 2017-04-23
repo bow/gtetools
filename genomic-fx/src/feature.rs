@@ -317,12 +317,19 @@ pub struct Gene {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
-    id: Option<String>,
-    attributes: HashMap<String, String>,
+    pub id: Option<String>,
+    pub attributes: HashMap<String, String>,
     transcripts: HashMap<String, Transcript>,
 }
 
 impl_common!(Gene);
+
+impl Gene {
+
+    pub fn transcripts(&self) -> &HashMap<String, Transcript> {
+        &self.transcripts
+    }
+}
 
 pub struct GBuilder {
     seq_name: String,
@@ -390,7 +397,7 @@ impl GBuilder {
         self
     }
 
-    pub fn transcript_coords<E>(
+    pub fn transcript_coords(
         mut self,
         transcript_coords: HashMap<String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>
     )-> Self
@@ -472,6 +479,9 @@ quick_error! {
         CodingInIntron {
             description("coding start and/or end lies in introns")
         }
+        TranscriptNotFullyEnveloped {
+            description("transcript coordinate not fully enveloped in gene coordinate")
+        }
     }
 }
 
@@ -550,6 +560,12 @@ fn resolve_transcripts_input(
         (None, Some(trxs_coords)) => {
             trxs_coords.into_iter()
                 .map(|(trx_id, (trx_coord, exon_coords, mcoding_coord))| {
+
+                    if trx_coord.0 < gene_interval.start || trx_coord.1 > gene_interval.end {
+                        return Err(
+                            Error::Feature(FeatureError::TranscriptNotFullyEnveloped));
+                    }
+
                     let mut tb = TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
                         .strand(*gene_strand)
                         .id(trx_id.clone())
