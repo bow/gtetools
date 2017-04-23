@@ -4,14 +4,56 @@ extern crate test;
 extern crate genomic_fx;
 extern crate bio;
 
-use bio::utils::Strand;
-use genomic_fx::TBuilder;
+use bio::utils::{Interval, Strand};
 use test::Bencher;
+
+use genomic_fx::{EBuilder, TBuilder, ExonFeature, ExonFeatureKind};
+use ExonFeatureKind::*;
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[bench]
+    fn ebuilder_no_features(b: &mut Bencher) {
+        b.iter(|| {
+            EBuilder::new("chrT", 100, 500)
+                .strand(Strand::Forward)
+                .build()
+        });
+    }
+
+    #[bench]
+    fn ebuiler_mult_features(b: &mut Bencher) {
+        b.iter(|| {
+            EBuilder::new("chrT", 100, 300)
+                .strand(Strand::Forward)
+                .features(vec![
+                    ExonFeature {
+                        interval: Interval::new(100..150).unwrap(),
+                        kind: UTR5,
+                    },
+                    ExonFeature {
+                        interval: Interval::new(150..153).unwrap(),
+                        kind: StartCodon { frame: Some(0) },
+                    },
+                    ExonFeature {
+                        interval: Interval::new(150..300).unwrap(),
+                        kind: CDS { frame: Some(0) },
+                    },
+                    ExonFeature {
+                        interval: Interval::new(300..303).unwrap(),
+                        kind: StopCodon { frame: Some(0) },
+                    },
+                    ExonFeature {
+                        interval: Interval::new(300..500).unwrap(),
+                        kind: UTR3,
+                    },
+                ])
+                .build()
+        });
+    }
 
     #[bench]
     fn tbuilder_single_exon_no_cds(b: &mut Bencher) {
