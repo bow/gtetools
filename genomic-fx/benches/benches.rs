@@ -4,10 +4,12 @@ extern crate test;
 extern crate genomic_fx;
 extern crate bio;
 
+use std::collections::HashMap;
+
 use bio::utils::{Interval, Strand};
 use test::Bencher;
 
-use genomic_fx::{EBuilder, TBuilder, ExonFeature, ExonFeatureKind};
+use genomic_fx::{ExonFeature, ExonFeatureKind, EBuilder, TBuilder, GBuilder};
 use ExonFeatureKind::*;
 
 
@@ -25,7 +27,7 @@ mod tests {
     }
 
     #[bench]
-    fn ebuiler_mult_features(b: &mut Bencher) {
+    fn ebuiler_5_features(b: &mut Bencher) {
         b.iter(|| {
             EBuilder::new("chrT", 100, 300)
                 .strand(Strand::Forward)
@@ -56,7 +58,7 @@ mod tests {
     }
 
     #[bench]
-    fn tbuilder_single_exon_no_cds(b: &mut Bencher) {
+    fn tbuilder_1_exon_no_cds(b: &mut Bencher) {
         b.iter(|| {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
@@ -67,7 +69,7 @@ mod tests {
     }
 
     #[bench]
-    fn tbuilder_single_exon_single_cds(b: &mut Bencher) {
+    fn tbuilder_1_exon_1_cds(b: &mut Bencher) {
         b.iter(|| {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
@@ -79,7 +81,7 @@ mod tests {
     }
 
     #[bench]
-    fn tbuilder_mult_exons_no_cds(b: &mut Bencher) {
+    fn tbuilder_12_exons_no_cds(b: &mut Bencher) {
         b.iter(|| {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
@@ -96,7 +98,7 @@ mod tests {
     }
 
     #[bench]
-    fn tbuilder_mult_exons_mult_cds(b: &mut Bencher) {
+    fn tbuilder_12_exons_with_cds(b: &mut Bencher) {
         b.iter(|| {
             TBuilder::new("chrT", 100, 10000)
                 .strand(Strand::Forward)
@@ -109,6 +111,55 @@ mod tests {
                         (3000, 6000), (7000, 8000), (9000, 10000),
                     ])
                 .coding_coord(200, 9500)
+                .build()
+        });
+    }
+
+    #[bench]
+    fn gbuilder_no_transcripts(b: &mut Bencher) {
+        b.iter(|| {
+            GBuilder::new("chrT", 100, 20000)
+                .strand(Strand::Forward)
+                .id("gx01")
+                .build()
+        });
+    }
+
+    #[bench]
+    fn gbuilder_3_transcripts_with_cds(b: &mut Bencher) {
+        b.iter(|| {
+            let mut coords = HashMap::new();
+            coords.insert(
+                "trx01".to_owned(),
+                ((100, 10000),
+                vec![
+                    (100, 300), (400, 500), (700, 1000),
+                    (1100, 1300), (1400, 1500), (1700, 2000),
+                    (2100, 2300), (2400, 2500), (2700, 3000),
+                    (3000, 6000), (7000, 8000), (9000, 10000)],
+                Some((200, 9500))));
+            coords.insert(
+                "trx02".to_owned(),
+                ((100, 10000),
+                vec![
+                    (100, 300), (400, 500), (700, 1000),
+                    (1100, 1300), (1400, 1500), (1700, 2000),
+                    (2100, 2300), (2400, 2500), (2700, 3000),
+                    (3000, 6000), (7000, 8000), (9000, 10000)],
+                Some((200, 9500))));
+            coords.insert(
+                "trx03".to_owned(),
+                ((100, 10000),
+                vec![
+                    (100, 300), (400, 500), (700, 1000),
+                    (1100, 1300), (1400, 1500), (1700, 2000),
+                    (2100, 2300), (2400, 2500), (2700, 3000),
+                    (3000, 6000), (7000, 8000), (9000, 10000)],
+                Some((200, 9500))));
+            GBuilder::new("chrT", 100, 20000)
+                .strand(Strand::Forward)
+                .id("gx01")
+                .transcript_coords(coords)
                 .build()
         });
     }
