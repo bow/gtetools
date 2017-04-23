@@ -324,6 +324,107 @@ pub struct Gene {
 
 impl_common!(Gene);
 
+pub struct GBuilder {
+    seq_name: String,
+    start: u64,
+    end: u64,
+    strand: Option<Strand>,
+    strand_char: Option<char>,
+    id: Option<String>,
+    attributes: HashMap<String, String>,
+    transcripts: Option<HashMap<String, Transcript>>,
+    transcript_coords: Option<HashMap<String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>>,
+    transcript_coding_incl_stop: bool,
+}
+
+impl GBuilder {
+
+    pub fn new<T>(seq_name: T, start: u64, end: u64) -> Self
+        where T: Into<String>
+    {
+        GBuilder {
+            seq_name: seq_name.into(),
+            start: start,
+            end: end,
+            strand: None,
+            strand_char: None,
+            id: None,
+            attributes: HashMap::new(),
+            transcripts: None,
+            transcript_coords: None,
+            transcript_coding_incl_stop: false,
+        }
+    }
+
+    pub fn strand(mut self, strand: Strand) -> Self {
+        self.strand = Some(strand);
+        self
+    }
+
+    pub fn strand_char(mut self, strand_char: char) -> Self {
+        self.strand_char = Some(strand_char);
+        self
+    }
+
+    pub fn id<T>(mut self, id: T) -> Self
+        where T: Into<String>
+    {
+        self.id = Some(id.into());
+        self
+    }
+
+    pub fn attribute<K, V>(mut self, key: K, value: V) -> Self
+        where K: Into<String>, V: Into<String>
+    {
+        self.attributes.insert(key.into(), value.into());
+        self
+    }
+
+    pub fn attributes(mut self, attributes: HashMap<String, String>) -> Self {
+        self.attributes = attributes;
+        self
+    }
+
+    pub fn transcripts(mut self, transcripts: HashMap<String, Transcript>) -> Self {
+        self.transcripts = Some(transcripts);
+        self
+    }
+
+    pub fn transcript_coords<E>(
+        mut self,
+        transcript_coords: HashMap<String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>
+    )-> Self
+    {
+        self.transcript_coords = Some(transcript_coords);
+        self
+    }
+
+    pub fn transcript_coding_incl_stop(mut self, incl_stop: bool) -> Self {
+        self.transcript_coding_incl_stop = incl_stop;
+        self
+    }
+
+    pub fn build(self) -> Result<Gene, Error> {
+        let interval = coord_to_interval(self.start, self.end)
+            .map_err(Error::Feature)?;
+        let strand = resolve_strand_input(self.strand, self.strand_char)
+            .map_err(Error::Feature)?;
+        let transcripts = resolve_transcripts_input(
+            &self.seq_name, &interval, &strand, self.transcripts, self.transcript_coords,
+            self.transcript_coding_incl_stop)?;
+
+        let gene = Gene {
+            seq_name: self.seq_name,
+            interval: interval,
+            strand: strand,
+            id: self.id,
+            attributes: self.attributes,
+            transcripts: transcripts,
+        };
+        Ok(gene)
+    }
+}
+
 quick_error! {
     #[derive(Debug)]
     pub enum FeatureError {
@@ -408,10 +509,6 @@ fn resolve_exons_input(
     coding_incl_stop: bool
 ) -> Result<Vec<Exon>, FeatureError>
 {
-    // Deliberately not handling all possible input types to avoid
-    // overcomplicating code. The inputs are expected to come from
-    // either GTF or refFlat after all.
-
     match (exons, exon_coords, coding_coord) {
         // nothing defined -> the transcript doesn't have any known exons
         (None, None, None) => Ok(Vec::new()),
@@ -429,6 +526,42 @@ fn resolve_exons_input(
             infer_exons(transcript_seqname, transcript_interval,
                         transcript_strand, raw_exon_coords, raw_coding_coord,
                         coding_incl_stop),
+    }
+}
+
+fn resolve_transcripts_input(
+    gene_seqname: &String,
+    gene_interval: &Interval<u64>,
+    gene_strand: &Strand,
+    transcripts: Option<HashMap<String, Transcript>>,
+    transcript_coords: Option<HashMap<String,
+                                      (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>>,
+    transcript_coding_incl_stop: bool
+) -> Result<HashMap<String, Transcript>, Error>
+{
+    match (transcripts, transcript_coords) {
+        // nothing defined -> the gene doesn't have any known transcripts
+        (None, None) => Ok(HashMap::new()),
+
+        // transcript defined, return it
+        (Some(trxs), _) => Ok(trxs),
+
+        // transcripts coords defined, create transcripts
+        (None, Some(trxs_coords)) => {
+            trxs_coords.into_iter()
+                .map(|(trx_id, (trx_coord, exon_coords, mcoding_coord))| {
+                    let mut tb = TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
+                        .strand(*gene_strand)
+                        .id(trx_id.clone())
+                        .exon_coords(exon_coords)
+                        .coding_incl_stop(transcript_coding_incl_stop);
+                    if let Some(coding_coord) = mcoding_coord {
+                        tb = tb.coding_coord(coding_coord.0, coding_coord.1);
+                    };
+                    tb.build().map(|trx| (trx_id, trx))
+                })
+                .collect()
+        },
     }
 }
 
