@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use bio::utils::{self, Interval, IntervalError};
 use bio::utils::Strand;
 
-use Error;
+use {Coord, Error};
 use self::ExonFeatureKind::*;
 
 
@@ -162,7 +162,7 @@ impl EBuilder {
     }
 
     pub fn build(self) -> Result<Exon, Error> {
-        let interval = coords_to_interval(self.start, self.end)
+        let interval = coord_to_interval(self.start, self.end)
             .map_err(Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
             .map_err(Error::Feature)?;
@@ -209,8 +209,8 @@ pub struct TBuilder {
     exons: Option<Vec<Exon>>,
     // Or exon coordinates, possibly coupled with cds coord
     // NOTE: Can we instead of using Vec<_> here keep it as an unconsumed iterator?
-    exon_coords: Option<Vec<(u64, u64)>>,
-    coding_coord: Option<(u64, u64)>,
+    exon_coords: Option<Vec<Coord<u64>>>,
+    coding_coord: Option<Coord<u64>>,
     coding_incl_stop: bool,
 }
 
@@ -274,7 +274,7 @@ impl TBuilder {
     }
 
     pub fn exon_coords<E>(mut self, exon_coords: E)-> Self
-        where E: IntoIterator<Item=(u64, u64)>
+        where E: IntoIterator<Item=Coord<u64>>
     {
         self.exon_coords = Some(exon_coords.into_iter().collect());
         self
@@ -291,7 +291,7 @@ impl TBuilder {
     }
 
     pub fn build(self) -> Result<Transcript, Error> {
-        let interval = coords_to_interval(self.start, self.end)
+        let interval = coord_to_interval(self.start, self.end)
             .map_err(Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
             .map_err(Error::Feature)?;
@@ -374,7 +374,7 @@ quick_error! {
     }
 }
 
-fn coords_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
+fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
     Interval::new(start..end).map_err(FeatureError::from)
 }
 
@@ -403,8 +403,8 @@ fn resolve_exons_input(
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
     exons: Option<Vec<Exon>>,
-    exon_coords: Option<&Vec<(u64, u64)>>,
-    coding_coord: Option<(u64, u64)>,
+    exon_coords: Option<&Vec<Coord<u64>>>,
+    coding_coord: Option<Coord<u64>>,
     coding_incl_stop: bool
 ) -> Result<Vec<Exon>, FeatureError>
 {
@@ -436,8 +436,8 @@ fn infer_exons(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
-    exon_coords: &Vec<(u64, u64)>,
-    coding_coord: Option<(u64, u64)>,
+    exon_coords: &Vec<Coord<u64>>,
+    coding_coord: Option<Coord<u64>>,
     coding_incl_stop: bool
 ) -> Result<Vec<Exon>, FeatureError>
 {
@@ -523,8 +523,8 @@ fn infer_exons(
 }
 
 fn adjust_coding_coord(mut start: u64, mut end: u64,
-                       strand: &Strand, exon_coords: &Vec<(u64, u64)>
-) -> Option<(u64, u64)>
+                       strand: &Strand, exon_coords: &Vec<Coord<u64>>
+) -> Option<Coord<u64>>
 {
     let mut codon_rem = 3;
     match strand {
@@ -556,8 +556,8 @@ fn adjust_coding_coord(mut start: u64, mut end: u64,
 //  - coding coord within exon span
 //  - coding_coord.0 < coding_coord.1
 fn infer_exon_features(
-    exon_coords: &Vec<(u64, u64)>,
-    coding_r: (u64, u64),
+    exon_coords: &Vec<Coord<u64>>,
+    coding_r: Coord<u64>,
     transcript_seqname: &String,
     transcript_strand: &Strand)
 -> Result<Vec<Exon>, FeatureError> {

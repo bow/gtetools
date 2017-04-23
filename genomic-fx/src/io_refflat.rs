@@ -17,7 +17,7 @@ use std::str::FromStr;
 use csv;
 
 use feature::FeatureError;
-use {Strand, Transcript, TBuilder, Error};
+use {Coord, Strand, Transcript, TBuilder, Error};
 
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
@@ -79,7 +79,7 @@ impl RefFlatRecord {
     }
 
     #[inline]
-    fn zip_raw_exon_coords(&self) -> Vec<(u64, u64)> {
+    fn zip_raw_exon_coords(&self) -> Vec<Coord<u64>> {
         let exon_starts = self.exon_starts
             .split(',').filter_map(|item| u64::from_str(item).ok());
         let exon_ends = self.exon_ends

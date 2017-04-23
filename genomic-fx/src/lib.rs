@@ -39,3 +39,6 @@ quick_error! {
         }
     }
 }
+
+// Helper type for raw coordinates
+type Coord<T> = (T, T);
