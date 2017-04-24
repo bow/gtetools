@@ -54,6 +54,10 @@ impl RefFlatRecord {
     }
 
     pub fn to_transcript(self) -> Result<Transcript, Error> {
+        self.to_tupled_transcript().map(|(_, trx)| trx)
+    }
+
+    fn to_tupled_transcript(self) -> Result<(String, Transcript), Error> {
 
         let exon_coords = self.zip_raw_exon_coords();
         if exon_coords.len() != self.num_exons {
@@ -72,14 +76,15 @@ impl RefFlatRecord {
                 None
             };
 
+        let gene_id = self.gene_id;
         TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
             .id(self.transcript_name)
             .strand(strand)
             .coords(exon_coords, coding_coord)
             .coding_incl_stop(true)
-            .attribute("gene_id", self.gene_id)
             .build()
             .map_err(Error::from)
+            .map(|trx| (gene_id, trx))
     }
 
     #[inline]
@@ -106,8 +111,16 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
+    pub fn records<'a>(&'a mut self) -> RefFlatRecords<'a, R> {
+        RefFlatRecords {
+            inner: self.inner.decode()
+        }
+    }
+
     pub fn transcripts<'a>(&'a mut self) -> RefFlatTranscripts<'a, R> {
-        RefFlatTranscripts { inner: self.inner.decode() }
+        RefFlatTranscripts {
+            inner: self.records()
+        }
     }
 }
 
@@ -117,8 +130,25 @@ impl Reader<fs::File> {
     }
 }
 
-pub struct RefFlatTranscripts<'a, R: 'a> where R: io::Read {
+pub struct RefFlatRecords<'a, R: 'a> where R: io::Read {
     inner: csv::DecodedRecords<'a, R, RefFlatRow>,
+}
+
+impl<'a, R> Iterator for RefFlatRecords<'a, R> where R: io::Read {
+
+    type Item = Result<RefFlatRecord, Error>;
+
+    fn next(&mut self) -> Option<Result<RefFlatRecord, Error>> {
+        self.inner.next()
+            .map(|row| {
+                row.or_else(|err| Err(Error::from(err)))
+                    .map(RefFlatRecord::new)
+            })
+    }
+}
+
+pub struct RefFlatTranscripts<'a, R: 'a> where R: io::Read {
+    inner: RefFlatRecords<'a, R>,
 }
 
 impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
@@ -126,10 +156,7 @@ impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
     type Item = Result<Transcript, Error>;
 
     fn next(&mut self) -> Option<Result<Transcript, Error>> {
-        self.inner.next().map(|row| {
-            row.or_else(|err| Err(Error::from(err)))
-                .map(RefFlatRecord::new)
-                .and_then(|record| record.to_transcript())
-        })
+        self.inner.next()
+            .map(|record| record.and_then(|rec| rec.to_transcript()))
     }
 }
