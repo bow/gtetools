@@ -630,6 +630,29 @@ fn tbuilder_coords_fwd_coding_5_5() {
                             (950, 953, StopCodon { frame: Some(0) }), (950, 1000, UTR3)]);
 }
 
+#[test]
+fn tbuilder_coords_fwd_coding_incl_stop() {
+    let btrxe = TBuilder::new("chrT", 100, 1000)
+        .strand(Forward)
+        .coords(vec![(100, 400), (700, 1000)], Some((100, 1000)))
+        .build();
+    assert!(btrxe.is_err());
+
+    let btrx = TBuilder::new("chrT", 100, 1000)
+        .strand(Forward)
+        .coords(vec![(100, 400), (700, 1000)], Some((100, 1000)))
+        .coding_incl_stop(true)
+        .build();
+    assert!(btrx.is_ok(), "{:?}", btrx);
+    let trx = btrx.unwrap();
+    let fxs = exon_fxs_coords(&trx);
+    assert_eq!(fxs.len(), 2);
+    assert_eq!(fxs[0], vec![(100, 103, StartCodon { frame: Some(0) }),
+                            (100, 400, CDS { frame: Some(0) })]);
+    assert_eq!(fxs[1], vec![(700, 997, CDS { frame: Some(0) }),
+                            (997, 1000, StopCodon { frame: Some(0) }), (997, 1000, UTR3)]);
+}
+
 // Reverse strand cases
 
 #[test]
@@ -1189,6 +1212,29 @@ fn tbuilder_coords_rev_coding_5_5_to_trx5end() {
                             (997, 1000, StartCodon { frame: Some(0) })]);
 }
 
+#[test]
+fn tbuilder_coords_rev_coding_incl_stop() {
+    let btrxe = TBuilder::new("chrT", 100, 1000)
+        .strand(Reverse)
+        .coords(vec![(100, 400), (700, 1000)], Some((100, 1000)))
+        .build();
+    assert!(btrxe.is_err());
+
+    let btrx = TBuilder::new("chrT", 100, 1000)
+        .strand(Reverse)
+        .coords(vec![(100, 400), (700, 1000)], Some((100, 1000)))
+        .coding_incl_stop(true)
+        .build();
+    assert!(btrx.is_ok(), "{:?}", btrx);
+    let trx = btrx.unwrap();
+    let fxs = exon_fxs_coords(&trx);
+    assert_eq!(fxs.len(), 2);
+    assert_eq!(fxs[0], vec![(100, 103, UTR3), (100, 103, StopCodon { frame: Some(0) }),
+                            (103, 400, CDS { frame: Some(0) })]);
+    assert_eq!(fxs[1], vec![(700, 1000, CDS { frame: Some(0) }),
+                            (997, 1000, StartCodon { frame: Some(0) })]);
+}
+
 // Unknown strand cases
 
 #[test]
@@ -1339,4 +1385,20 @@ fn tbuilder_coords_unk_coding_5_5() {
     assert_eq!(fxs[0], vec![(100, 300, UTR)]);
     assert_eq!(fxs[1], vec![(400, 500, UTR)]);
     assert_eq!(fxs[2], vec![(700, 750, UTR), (750, 900, CDS { frame: None }), (900, 1000, UTR)]);
+}
+
+#[test]
+fn tbuilder_coords_unk_coding_incl_stop() {
+    let btrxe = TBuilder::new("chrT", 100, 1000)
+        .strand(Unknown)
+        .coords(vec![(100, 400), (700, 1000)], Some((100, 1000)))
+        .build();
+    assert!(btrxe.is_err());
+
+    let btrx = TBuilder::new("chrT", 100, 1000)
+        .strand(Unknown)
+        .coords(vec![(100, 400), (700, 1000)], Some((100, 1000)))
+        .coding_incl_stop(true)
+        .build();
+    assert!(btrx.is_err());
 }
