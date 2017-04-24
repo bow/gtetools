@@ -64,18 +64,22 @@ impl RefFlatRecord {
         let strand = Strand::from_char(&self.strand_char)
             .map_err(FeatureError::from)
             .map_err(Error::from)?;
-        let mut tb = TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
+
+        let coding_coord =
+            if self.coding_start != self.coding_end {
+                Some((self.coding_start, self.coding_end))
+            } else {
+                None
+            };
+
+        TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
             .id(self.transcript_name)
             .strand(strand)
-            .exon_coords(exon_coords)
+            .coords(exon_coords, coding_coord)
             .coding_incl_stop(true)
-            .attribute("gene_id", self.gene_id);
-
-        if self.coding_start != self.coding_end {
-            tb = tb.coding_coord(self.coding_start, self.coding_end)
-        }
-
-        tb.build().map_err(Error::from)
+            .attribute("gene_id", self.gene_id)
+            .build()
+            .map_err(Error::from)
     }
 
     #[inline]

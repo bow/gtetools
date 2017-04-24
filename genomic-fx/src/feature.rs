@@ -273,15 +273,11 @@ impl TBuilder {
         self
     }
 
-    pub fn exon_coords<E>(mut self, exon_coords: E)-> Self
+    pub fn coords<E>(mut self, exon_coords: E, coding_coord: Option<Coord<u64>>) -> Self
         where E: IntoIterator<Item=Coord<u64>>
     {
         self.exon_coords = Some(exon_coords.into_iter().collect());
-        self
-    }
-
-    pub fn coding_coord(mut self, start: u64, end: u64) -> Self {
-        self.coding_coord = Some((start, end));
+        self.coding_coord = coding_coord;
         self
     }
 
@@ -559,22 +555,20 @@ fn resolve_transcripts_input(
         // transcripts coords defined, create transcripts
         (None, Some(trxs_coords)) => {
             trxs_coords.into_iter()
-                .map(|(trx_id, (trx_coord, exon_coords, mcoding_coord))| {
+                .map(|(trx_id, (trx_coord, exon_coords, coding_coord))| {
 
                     if trx_coord.0 < gene_interval.start || trx_coord.1 > gene_interval.end {
                         return Err(
                             Error::Feature(FeatureError::TranscriptNotFullyEnveloped));
                     }
 
-                    let mut tb = TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
+                    TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
                         .strand(*gene_strand)
                         .id(trx_id.clone())
-                        .exon_coords(exon_coords)
-                        .coding_incl_stop(transcript_coding_incl_stop);
-                    if let Some(coding_coord) = mcoding_coord {
-                        tb = tb.coding_coord(coding_coord.0, coding_coord.1);
-                    };
-                    tb.build().map(|trx| (trx_id, trx))
+                        .coords(exon_coords, coding_coord)
+                        .coding_incl_stop(transcript_coding_incl_stop)
+                        .build()
+                        .map(|trx| (trx_id, trx))
                 })
                 .collect()
         },

@@ -28,14 +28,10 @@ fn trx_fxs<T>(start: u64, end: u64, strand: Strand, exon_coords: T,
 ) -> (Transcript, Vec<Vec<(u64, u64, ExonFeatureKind)>>)
 where T: IntoIterator<Item=(u64, u64)>
 {
-    let mut btrx = TBuilder::new("chrT", start, end)
+    let trx = TBuilder::new("chrT", start, end)
             .strand(strand)
-            .exon_coords(exon_coords);
-    if let Some((a, b)) = coding_coord {
-        btrx = btrx.coding_coord(a, b);
-    }
-    let rtrx = btrx.build();
-    let trx = rtrx.unwrap();
+            .coords(exon_coords, coding_coord)
+            .build().unwrap();
     let fxs = exon_fxs_coords(&trx);
     (trx, fxs)
 }
@@ -47,7 +43,7 @@ fn tbuilder_basic() {
     attribs.insert("key2".to_owned(), "value2".to_owned());
     let btrx = TBuilder::new("chrT", 100, 1000)
         .strand(Reverse)
-        .exon_coords(vec![(100, 300), (400, 500), (700, 1000)])
+        .coords(vec![(100, 300), (400, 500), (700, 1000)], None)
         .attributes(attribs)
         .id("transcript-1")
         .build();
@@ -67,7 +63,7 @@ fn tbuilder_basic() {
 fn tbuilder_alt1() {
     let btrx = TBuilder::new("chrT", 100, 1000)
         .strand(Reverse)
-        .exon_coords(vec![(100, 300), (400, 500), (700, 1000)])
+        .coords(vec![(100, 300), (400, 500), (700, 1000)], None)
         .attribute("tag", "basic")
         .build();
     assert!(btrx.is_ok(), "{:?}", btrx);
