@@ -58,7 +58,7 @@ impl RefFlatRecord {
 
     pub fn to_transcript(self) -> Result<Transcript, Error> {
 
-        let exon_coords = self.zip_raw_exon_coords();
+        let exon_coords = self.zip_raw_exon_coords()?;
         if exon_coords.len() != self.num_exons {
             return Err(Error::RefFlat(
                 "number of exon and exon coordinates mismatch"));
@@ -88,12 +88,19 @@ impl RefFlatRecord {
     }
 
     #[inline]
-    fn zip_raw_exon_coords(&self) -> Vec<Coord<u64>> {
+    fn zip_raw_exon_coords(&self) -> Result<Vec<Coord<u64>>, Error> {
         let exon_starts = self.exon_starts
-            .split(',').filter_map(|item| u64::from_str(item).ok());
+            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(Error::from));
         let exon_ends = self.exon_ends
-            .split(',').filter_map(|item| u64::from_str(item).ok());
-        exon_starts.zip(exon_ends).collect()
+            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(Error::from));
+
+        let mut res = vec![];
+        for (rstart, rend) in exon_starts.zip(exon_ends) {
+            let start = rstart?;
+            let end = rend?;
+            res.push((start, end));
+        }
+        Ok(res)
     }
 }
 

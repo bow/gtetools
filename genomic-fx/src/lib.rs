@@ -5,6 +5,7 @@ extern crate itertools;
 extern crate quick_error;
 
 use std::io::Error as StdIoError;
+use std::num::ParseIntError;
 
 pub use bio::utils::Strand;
 use csv::Error as CsvError;
@@ -36,6 +37,11 @@ quick_error! {
             cause(err)
         }
         Io(err: StdIoError) {
+            description(err.description())
+            from()
+            cause(err)
+        }
+        ParseInt(err: ParseIntError) {
             description(err.description())
             from()
             cause(err)
