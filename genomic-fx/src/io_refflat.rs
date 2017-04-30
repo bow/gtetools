@@ -194,6 +194,7 @@ impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
                             .id(gid)
                             .strand_char(strand_char)
                             .transcripts(transcripts)
+                            .transcript_coding_incl_stop(true)
                             .build()
                     },
                     None => Err(records.filter_map(|x| x.err()).next().unwrap())
