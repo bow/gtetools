@@ -10,12 +10,14 @@ pub use bio::utils::Strand;
 use csv::Error as CsvError;
 
 mod feature;
-pub mod io_refflat;
-
 pub use feature::{Feature, FeatureError, FeatureKind,
                   EBuilder, Exon, ExonFeature, ExonFeatureKind,
                   TBuilder, Transcript, TranscriptFeature, TranscriptFeatureKind,
                   GBuilder, Gene, GeneFeature, GeneFeatureKind};
+
+mod io_refflat;
+pub use io_refflat::{Reader as RefFlatReader, RefFlatRow, RefFlatRecord,
+                     RefFlatRecords, RefFlatTranscripts, RefFlatGenes};
 
 quick_error! {
     #[derive(Debug)]
