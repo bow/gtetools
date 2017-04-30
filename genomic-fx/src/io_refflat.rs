@@ -57,10 +57,6 @@ impl RefFlatRecord {
     }
 
     pub fn to_transcript(self) -> Result<Transcript, Error> {
-        self.to_tupled_transcript().map(|(_, trx)| trx)
-    }
-
-    fn to_tupled_transcript(self) -> Result<(String, Transcript), Error> {
 
         let exon_coords = self.zip_raw_exon_coords();
         if exon_coords.len() != self.num_exons {
@@ -79,15 +75,16 @@ impl RefFlatRecord {
                 None
             };
 
-        let gene_id = self.gene_id;
+        let mut attribs = HashMap::new();
+        attribs.insert("gene_id".to_owned(), self.gene_id);
         TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
             .id(self.transcript_name)
             .strand(strand)
             .coords(exon_coords, coding_coord)
             .coding_incl_stop(true)
+            .attributes(attribs)
             .build()
             .map_err(Error::from)
-            .map(|trx| (gene_id, trx))
     }
 
     #[inline]
