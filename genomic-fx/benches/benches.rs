@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use bio::utils::{Interval, Strand};
 use test::Bencher;
 
-use genomic_fx::{ExonFeature, ExonFeatureKind, EBuilder, TBuilder, GBuilder};
+use genomic_fx::{ExonFeature, ExonFeatureKind, EBuilder, TBuilder, GBuilder, RefFlatReader};
 use ExonFeatureKind::*;
 
 
@@ -159,6 +159,54 @@ mod tests {
                 .id("gx01")
                 .transcript_coords(coords)
                 .build()
+        });
+    }
+
+    const REFFLAT_MULT_ROWS: &'static [u8] = b"TNFRSF14\tNM_001297605\tchr1\t+\t2556364\t2565622\t2556664\t2562868\t7\t2556364,2557725,2558342,2559822,2560623,2562864,2563147,\t2556733,2557834,2558468,2559978,2560714,2562896,2565622,
+TNFRSF14\tNM_003820\tchr1\t+\t2556364\t2565622\t2556664\t2563273\t8\t2556364,2557725,2558342,2559822,2560623,2561672,2562864,2563147,\t2556733,2557834,2558468,2559978,2560714,2561815,2562896,2565622,
+SMIM12\tNM_001164824\tchr1\t-\t34850361\t34859045\t34855698\t34855977\t3\t34850361,34856555,34858839,\t34855982,34856739,34859045,
+SMIM12\tNM_001164825\tchr1\t-\t34850361\t34859737\t34855698\t34855977\t2\t34850361,34859454,\t34855982,34859737,
+SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,34859676,\t34855982,34859816,";
+
+    #[bench]
+    fn refflat_reader_mult_rows_records(b: &mut Bencher) {
+        b.iter(|| {
+            let mut count = 0;
+            let mut reader = RefFlatReader::from_reader(REFFLAT_MULT_ROWS);
+            for rec in reader.records() {
+                if let Ok(_) = rec {
+                    count += 1;
+                }
+            }
+            assert_eq!(count, 5);
+        });
+    }
+
+    #[bench]
+    fn refflat_reader_mult_rows_transcripts(b: &mut Bencher) {
+        b.iter(|| {
+            let mut count = 0;
+            let mut reader = RefFlatReader::from_reader(REFFLAT_MULT_ROWS);
+            for trx in reader.transcripts() {
+                if let Ok(_) = trx {
+                    count += 1;
+                }
+            }
+            assert_eq!(count, 5);
+        });
+    }
+
+    #[bench]
+    fn refflat_reader_mult_rows_genes(b: &mut Bencher) {
+        b.iter(|| {
+            let mut count = 0;
+            let mut reader = RefFlatReader::from_reader(REFFLAT_MULT_ROWS);
+            for gx in reader.genes() {
+                if let Ok(_) = gx {
+                    count += 1;
+                }
+            }
+            assert_eq!(count, 2);
         });
     }
 }
