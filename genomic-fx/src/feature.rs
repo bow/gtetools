@@ -673,19 +673,25 @@ fn adjust_coding_coord(mut start: u64, mut end: u64,
     match strand {
         &Strand::Forward => {
             for &(exon_start, exon_end) in exon_coords.iter().rev() {
-                if end <= exon_end {
+                if exon_start <= end && end <= exon_end {
                     let adj_end = max(end - codon_rem, exon_start);
                     codon_rem -= end - adj_end;
                     end = adj_end;
+                    if codon_rem == 0 {
+                        break;
+                    }
                 }
             }
         },
         &Strand::Reverse => {
             for &(exon_start, exon_end) in exon_coords.iter() {
-                if exon_start <= start {
+                if exon_start <= start  && start <= exon_end {
                     let adj_start = min(start + codon_rem, exon_end);
                     codon_rem -= adj_start - start;
                     start = adj_start;
+                    if codon_rem == 0 {
+                        break;
+                    }
                 }
             }
         },
