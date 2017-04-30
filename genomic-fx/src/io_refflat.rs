@@ -211,3 +211,158 @@ fn groupf(result: &Result<RefFlatRecord, Error>) -> GroupKey {
     result.as_ref().ok()
         .map(|ref res| (res.gene_id.clone(), res.seq_name.clone(), res.strand_char.clone()))
 }
+
+
+#[cfg(test)]
+mod test {
+
+    use super::*;
+
+    fn next_rec<'a, R>(rr: &mut RefFlatRecords<'a, R>) -> RefFlatRecord where R: io::Read {
+        rr.next().expect("a refflat record result").expect("a refflat record")
+    }
+
+    fn next_trx<'a, R>(rt: &mut RefFlatTranscripts<'a, R>) -> Transcript where R: io::Read {
+        rt.next().expect("a transcript result").expect("a transcript")
+    }
+
+    fn next_gx<'a, R>(rg: &mut RefFlatGenes<'a, R>) -> Gene where R: io::Read {
+        rg.next().expect("a gene result").expect("a gene")
+    }
+
+    const REFFLAT_SINGLE_ROW_NO_CDS: &'static [u8] =  b"DDX11L1\tNR_046018\tchr1\t+\t11873\t14409\t14409\t14409\t3\t11873,12612,13220,\t12227,12721,14409,";
+
+    #[test]
+    fn records_single_row_no_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_SINGLE_ROW_NO_CDS);
+        let mut records = reader.records();
+
+        let rec1 = next_rec(&mut records);
+        assert_eq!(rec1.gene_id, "DDX11L1".to_owned());
+
+        assert!(records.next().is_none());
+    }
+
+    #[test]
+    fn transcripts_single_row_no_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_SINGLE_ROW_NO_CDS);
+        let mut transcripts = reader.transcripts();
+
+        let trx1 = next_trx(&mut transcripts);
+        assert_eq!(trx1.id, Some("NR_046018".to_owned()));
+
+        assert!(transcripts.next().is_none());
+    }
+
+    #[test]
+    fn genes_single_row_no_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_SINGLE_ROW_NO_CDS);
+        let mut genes = reader.genes();
+
+        let gx1 = next_gx(&mut genes);
+        assert_eq!(gx1.id, Some("DDX11L1".to_owned()));
+
+        assert!(genes.next().is_none());
+    }
+
+    const REFFLAT_MULT_ROWS_NO_CDS: &'static [u8] =  b"DDX11L1\tNR_046018\tchr1\t+\t11873\t14409\t14409\t14409\t3\t11873,12612,13220,\t12227,12721,14409,
+MIR570\tNR_030296\tchr3\t+\t195699400\t195699497\t195699497\t195699497\t1\t195699400,\t195699497,";
+
+    #[test]
+    fn records_mult_rows_no_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_MULT_ROWS_NO_CDS);
+        let mut records = reader.records();
+
+        let rec1 = next_rec(&mut records);
+        assert_eq!(rec1.gene_id, "DDX11L1".to_owned());
+
+        let rec2 = next_rec(&mut records);
+        assert_eq!(rec2.gene_id, "MIR570".to_owned());
+
+        assert!(records.next().is_none());
+    }
+
+    #[test]
+    fn transcripts_mult_rows_no_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_MULT_ROWS_NO_CDS);
+        let mut transcripts = reader.transcripts();
+
+        let trx1 = next_trx(&mut transcripts);
+        assert_eq!(trx1.id, Some("NR_046018".to_owned()));
+
+        let trx2 = next_trx(&mut transcripts);
+        assert_eq!(trx2.id, Some("NR_030296".to_owned()));
+
+        assert!(transcripts.next().is_none());
+    }
+
+    #[test]
+    fn genes_mult_rows_no_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_MULT_ROWS_NO_CDS);
+        let mut genes = reader.genes();
+
+        let gx1 = next_gx(&mut genes);
+        assert_eq!(gx1.id, Some("DDX11L1".to_owned()));
+
+        let gx2 = next_gx(&mut genes);
+        assert_eq!(gx2.id, Some("MIR570".to_owned()));
+
+        assert!(genes.next().is_none());
+    }
+
+    const REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS: &'static [u8] = b"TNFRSF14\tNM_001297605\tchr1\t+\t2556364\t2565622\t2556664\t2562868\t7\t2556364,2557725,2558342,2559822,2560623,2562864,2563147,\t2556733,2557834,2558468,2559978,2560714,2562896,2565622,
+TNFRSF14\tNM_003820\tchr1\t+\t2556364\t2565622\t2556664\t2563273\t8\t2556364,2557725,2558342,2559822,2560623,2561672,2562864,2563147,\t2556733,2557834,2558468,2559978,2560714,2561815,2562896,2565622,
+SMIM12\tNM_001164824\tchr1\t-\t34850361\t34859045\t34855698\t34855977\t3\t34850361,34856555,34858839,\t34855982,34856739,34859045,
+SMIM12\tNM_001164825\tchr1\t-\t34850361\t34859737\t34855698\t34855977\t2\t34850361,34859454,\t34855982,34859737,
+SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,34859676,\t34855982,34859816,";
+
+    #[test]
+    fn records_mult_rows_mult_genes_with_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS);
+        let mut records = reader.records();
+
+        let rec1 = next_rec(&mut records);
+        assert_eq!(rec1.transcript_name, "NM_001297605".to_owned());
+
+        let _rec2 = next_rec(&mut records);
+        let _rec3 = next_rec(&mut records);
+        let _rec4 = next_rec(&mut records);
+
+        let rec5 = next_rec(&mut records);
+        assert_eq!(rec5.transcript_name, "NM_138428".to_owned());
+
+        assert!(records.next().is_none());
+    }
+
+    #[test]
+    fn transcripts_mult_rows_mult_genes_with_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS);
+        let mut transcripts = reader.transcripts();
+
+        let trx1 = next_trx(&mut transcripts);
+        assert_eq!(trx1.id, Some("NM_001297605".to_owned()));
+
+        let _trx2 = next_trx(&mut transcripts);
+        let _trx3 = next_trx(&mut transcripts);
+        let _trx4 = next_trx(&mut transcripts);
+
+        let trx5 = next_trx(&mut transcripts);
+        assert_eq!(trx5.id, Some("NM_138428".to_owned()));
+
+        assert!(transcripts.next().is_none());
+    }
+
+    #[test]
+    fn genes_mult_rows_mult_genes_with_cds() {
+        let mut reader = Reader::from_reader(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS);
+        let mut genes = reader.genes();
+
+        let gx1 = next_gx(&mut genes);
+        assert_eq!(gx1.id, Some("TNFRSF14".to_owned()));
+
+        let gx2 = next_gx(&mut genes);
+        assert_eq!(gx2.id, Some("SMIM12".to_owned()));
+
+        assert!(genes.next().is_none());
+    }
+}
