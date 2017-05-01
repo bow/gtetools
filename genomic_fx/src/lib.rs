@@ -17,7 +17,8 @@ pub use feature::{Feature, FeatureError, FeatureKind,
                   GBuilder, Gene, GeneFeature, GeneFeatureKind};
 
 mod io_refflat;
-pub use io_refflat::{Reader as RefFlatReader, RefFlatRow, RefFlatRecord,
+pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
+                     RefFlatRow, RefFlatRecord,
                      RefFlatRecords, RefFlatTranscripts, RefFlatGenes};
 
 quick_error! {

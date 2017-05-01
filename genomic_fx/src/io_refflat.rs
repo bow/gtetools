@@ -214,6 +214,36 @@ impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
     }
 }
 
+pub struct Writer<W: io::Write> {
+    inner: csv::Writer<W>,
+}
+
+impl<W: io::Write> Writer<W> {
+
+    pub fn from_writer(in_writer: W) -> Writer<W> {
+        Writer {
+            inner: csv::Writer::from_writer(in_writer)
+                .delimiter(b'\t')
+                .quote_style(csv::QuoteStyle::Never)
+        }
+    }
+
+    pub fn write(&mut self, row: &RefFlatRow) -> Result<(), Error> {
+        self.inner
+            .encode((&row.0, &row.1, &row.2, row.3, row.4, row.5, row.6, row.7, row.8,
+                     &row.9, &row.10))
+            .map_err(Error::from)
+    }
+}
+
+impl Writer<fs::File> {
+
+    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+        let f = fs::File::create(path).map_err(Error::from)?;
+        Ok(Writer::from_writer(f))
+    }
+}
+
 type GroupKey = Option<(String, String, char)>;
 
 type GroupFunc = fn(&Result<RefFlatRecord, Error>) -> GroupKey;
@@ -225,7 +255,7 @@ fn groupf(result: &Result<RefFlatRecord, Error>) -> GroupKey {
 
 
 #[cfg(test)]
-mod test {
+mod test_reader {
 
     use super::*;
 
@@ -375,5 +405,27 @@ SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,
         assert_eq!(gx2.id, Some("SMIM12".to_owned()));
 
         assert!(genes.next().is_none());
+    }
+}
+
+#[cfg(test)]
+mod test_writer {
+
+    use super::*;
+
+    const REFFLAT_SINGLE_ROW_NO_CDS: &'static [u8] =  b"DDX11L1\tNR_046018\tchr1\t+\t11873\t14409\t14409\t14409\t3\t11873,12612,13220,\t12227,12721,14409,
+";
+
+    #[test]
+    fn records_single_row_no_cds() {
+        let mut writer = Writer::from_writer(vec![]);
+        let rec: RefFlatRow =
+            ("DDX11L1".to_owned(), "NR_046018".to_owned(), "chr1".to_owned(),
+             '+', 11873, 14409, 14409, 14409, 3,
+             "11873,12612,13220,".to_owned(), "12227,12721,14409,".to_owned());
+        let res = writer.write(&rec);
+        assert!(res.is_ok(), "{:?}", res);
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
     }
 }
