@@ -40,21 +40,6 @@ pub struct RefFlatRecord {
 }
 
 impl RefFlatRecord {
-    pub fn new(row: RefFlatRow) -> RefFlatRecord {
-        RefFlatRecord {
-            gene_id: row.0,
-            transcript_name: row.1,
-            seq_name: row.2,
-            strand_char: row.3,
-            trx_start: row.4,
-            trx_end: row.5,
-            coding_start: row.6,
-            coding_end: row.7,
-            num_exons: row.8,
-            exon_starts: row.9,
-            exon_ends: row.10,
-        }
-    }
 
     pub fn to_transcript(self) -> Result<Transcript, Error> {
 
@@ -101,6 +86,25 @@ impl RefFlatRecord {
             res.push((start, end));
         }
         Ok(res)
+    }
+}
+
+impl From<RefFlatRow> for RefFlatRecord {
+
+    fn from(row: RefFlatRow) -> Self {
+        RefFlatRecord {
+            gene_id: row.0,
+            transcript_name: row.1,
+            seq_name: row.2,
+            strand_char: row.3,
+            trx_start: row.4,
+            trx_end: row.5,
+            coding_start: row.6,
+            coding_end: row.7,
+            num_exons: row.8,
+            exon_starts: row.9,
+            exon_ends: row.10,
+        }
     }
 }
 
@@ -155,7 +159,7 @@ impl<'a, R> Iterator for RefFlatRecords<'a, R> where R: io::Read {
         self.inner.next()
             .map(|row| {
                 row.or_else(|err| Err(Error::from(err)))
-                    .map(RefFlatRecord::new)
+                    .map(RefFlatRecord::from)
             })
     }
 }
