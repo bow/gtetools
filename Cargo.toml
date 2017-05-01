@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 
 [dependencies]
-genomic-fx = { path = "genomic-fx", "version" = "~0.1.0" }
+genomic_fx = { path = "genomic_fx", "version" = "~0.1.0" }
 
 [dependencies.clap]
 version = "~2.20.5"
@@ -16,4 +16,4 @@ name = "gnftools"
 path = "src/main.rs"
 
 [workspace]
-members = ["genomic-fx"]
+members = ["genomic_fx"]
