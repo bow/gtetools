@@ -195,6 +195,102 @@ impl Transcript {
     pub fn exons(&self) -> &[Exon] {
         self.exons.as_slice()
     }
+
+    pub fn coding_coord(&self, incl_stop: bool) -> Option<Coord<u64>> {
+        let start = self.coding_start_coord(incl_stop);
+        let end = self.coding_end_coord(incl_stop);
+        match (start, end) {
+            (Some(s), Some(e)) => Some((s, e)),
+            _ => None,
+        }
+    }
+
+    fn coding_start_coord(&self, incl_stop: bool) -> Option<u64> {
+        match &self.strand {
+            &Strand::Forward => {
+                for exon in self.exons.iter() {
+                    for fx in exon.features.iter() {
+                        if let StartCodon { .. } = fx.kind {
+                            return Some(fx.interval.start);
+                        }
+                    }
+                }
+                None
+            },
+            &Strand::Reverse => {
+                let mut codon_rem = if incl_stop { 0 } else { 3 };
+                for exon in self.exons.iter() {
+                    for fx in exon.features.iter() {
+                        if let StopCodon { .. } = fx.kind {
+                            if incl_stop {
+                                return Some(fx.interval.start);
+                            }
+                            codon_rem -= fx.span();
+                            if codon_rem == 0 {
+                                return Some(fx.interval.end);
+                            }
+                        }
+                    }
+                }
+                None
+            },
+            &Strand::Unknown if incl_stop => {
+                for exon in self.exons.iter() {
+                    for fx in exon.features.iter() {
+                        if let CDS { .. } = fx.kind {
+                            return Some(fx.interval.start)
+                        }
+                    }
+                }
+                None
+            },
+            _ => None
+        }
+    }
+
+    fn coding_end_coord(&self, incl_stop: bool) -> Option<u64> {
+        match &self.strand {
+            &Strand::Forward => {
+                let mut codon_rem = if incl_stop { 0 } else { 3 };
+                for exon in self.exons.iter().rev() {
+                    for fx in exon.features.iter().rev() {
+                        if let StopCodon { .. } = fx.kind {
+                            if incl_stop {
+                                return Some(fx.interval.end);
+                            }
+                            codon_rem -= fx.span();
+                            if codon_rem == 0 {
+                                return Some(fx.interval.start);
+                            }
+                        }
+                    }
+                }
+                None
+            },
+            &Strand::Reverse => {
+                for exon in self.exons.iter().rev() {
+                    for fx in exon.features.iter().rev() {
+                        if let StartCodon { .. } = fx.kind {
+                            return Some(fx.interval.end);
+                        }
+                    }
+                }
+                None
+            },
+            &Strand::Unknown if incl_stop => {
+                for exon in self.exons.iter().rev() {
+                    for fx in exon.features.iter().rev() {
+                        if let CDS { .. } = fx.kind {
+                            return Some(fx.interval.end);
+                        }
+                    }
+                }
+                None
+            },
+            _ => None,
+        }
+    }
+
 }
 
 pub struct TBuilder {
