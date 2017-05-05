@@ -234,6 +234,54 @@ impl<W: io::Write> Writer<W> {
                      &row.9, &row.10))
             .map_err(Error::from)
     }
+
+    pub fn write_record(&mut self, record: &RefFlatRecord) -> Result<(), Error> {
+        self.inner
+            .encode((&record.gene_id, &record.transcript_name, &record.seq_name,
+                     record.strand_char, record.trx_start, record.trx_end,
+                     record.coding_start, record.coding_end, record.num_exons,
+                     &record.exon_starts, &record.exon_ends))
+            .map_err(Error::from)
+    }
+
+    pub fn write_transcript(&mut self, transcript: &Transcript) -> Result<(), Error> {
+        let gene_id = transcript.attributes.get("gene_id")
+            .map(|gid| gid.as_ref()).unwrap_or("");
+        let transcript_name = transcript.id.as_ref()
+            .map(|tn| tn.as_ref()).unwrap_or("");
+        let strand_char = match transcript.strand() {
+            &Strand::Forward => '+',
+            &Strand::Reverse => '-',
+            &Strand::Unknown => '.',
+        };
+
+        let (coding_start, coding_end) = transcript.coding_coord(true)
+            .unwrap_or((transcript.interval().end, transcript.interval().end));
+        let (exon_starts, exon_ends) = Self::coords_field(&transcript);
+
+        self.inner
+            .encode((gene_id, transcript_name, transcript.seq_name(), strand_char,
+                     transcript.interval().start, transcript.interval().end,
+                     coding_start, coding_end, transcript.exons().len(),
+                     exon_starts, exon_ends))
+            .map_err(Error::from)
+    }
+
+    pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
+        for (_, transcript) in gene.transcripts() {
+            self.write_transcript(&transcript)?;
+        }
+        Ok(())
+    }
+
+    #[inline(always)]
+    fn coords_field(trx: &Transcript) -> (String, String) {
+        let mut starts = trx.exons().iter().map(|exon| exon.interval().start).join(",");
+        starts.push(',');
+        let mut ends = trx.exons().iter().map(|exon| exon.interval().end).join(",");
+        ends.push(',');
+        (starts, ends)
+    }
 }
 
 impl Writer<fs::File> {
@@ -425,6 +473,26 @@ mod test_writer {
              "11873,12612,13220,".to_owned(), "12227,12721,14409,".to_owned());
         let res = writer.write(&rec);
         assert!(res.is_ok(), "{:?}", res);
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
+    }
+
+    #[test]
+    fn transcripts_single_row_no_cds() {
+        let mut attribs = HashMap::new();
+        attribs.insert("gene_id".to_owned(), "DDX11L1".to_owned());
+        let trx = TBuilder::new("chr1", 11873,  14409)
+            .strand_char('+')
+            .id("NR_046018")
+            .attributes(attribs)
+            .coords(vec![(11873, 12227), (12612, 12721), (13220, 14409)], None)
+            .coding_incl_stop(true)
+            .build()
+            .expect("a transcript");
+
+        let mut writer = Writer::from_writer(vec![]);
+        let res = writer.write_transcript(&trx);
+        assert!(res.is_ok(), "{:?}");
         assert_eq!(writer.inner.as_string(),
                    String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
     }
