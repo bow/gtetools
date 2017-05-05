@@ -60,14 +60,12 @@ impl RefFlatRecord {
                 None
             };
 
-        let mut attribs = HashMap::new();
-        attribs.insert("gene_id".to_owned(), self.gene_id);
         TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
             .id(self.transcript_name)
             .strand(strand)
             .coords(exon_coords, coding_coord)
             .coding_incl_stop(true)
-            .attributes(attribs)
+            .attribute("gene_id", self.gene_id)
             .build()
             .map_err(Error::from)
     }
@@ -479,12 +477,10 @@ mod test_writer {
 
     #[test]
     fn transcripts_single_row_no_cds() {
-        let mut attribs = HashMap::new();
-        attribs.insert("gene_id".to_owned(), "DDX11L1".to_owned());
         let trx = TBuilder::new("chr1", 11873,  14409)
             .strand_char('+')
             .id("NR_046018")
-            .attributes(attribs)
+            .attribute("gene_id", "DDX11L1")
             .coords(vec![(11873, 12227), (12612, 12721), (13220, 14409)], None)
             .coding_incl_stop(true)
             .build()
