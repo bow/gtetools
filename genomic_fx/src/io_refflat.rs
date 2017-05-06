@@ -681,4 +681,61 @@ SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,
         assert_eq!(writer.inner.as_string(),
                    String::from_utf8_lossy(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS));
     }
+
+    #[test]
+    fn genes_mult_rows_mult_genes_with_cds() {
+        let mut trxs1 = Vec::new();
+        trxs1.push((
+            "NM_001297605".to_owned(),
+            ((2556364, 2565622),
+             vec![(2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
+                  (2560623, 2560714), (2562864, 2562896), (2563147, 2565622)],
+             Some((2556664, 2562868)))));
+
+        trxs1.push((
+           "NM_003820".to_owned(),
+           ((2556364, 2565622),
+            vec![(2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
+                 (2560623, 2560714), (2561672, 2561815), (2562864, 2562896), (2563147, 2565622)],
+            Some((2556664, 2563273)))));
+
+        let mut trxs2 = Vec::new();
+        trxs2.push((
+           "NM_001164824".to_owned(),
+           ((34850361, 34859045),
+            vec![(34850361, 34855982), (34856555, 34856739), (34858839, 34859045)],
+            Some((34855698, 34855977)))));
+
+        trxs2.push((
+           "NM_001164825".to_owned(),
+           ((34850361, 34859737), vec![(34850361, 34855982), (34859454, 34859737)],
+            Some((34855698, 34855977)))));
+
+        trxs2.push((
+           "NM_138428".to_owned(),
+           ((34850361, 34859816), vec![(34850361, 34855982), (34859676, 34859816)],
+            Some((34855698, 34855977)))));
+
+        let gxs = vec![
+            GBuilder::new("chr1", 2556364, 2565622)
+                .strand(Strand::Forward)
+                .id("TNFRSF14")
+                .transcript_coords(trxs1)
+                .transcript_coding_incl_stop(true)
+                .build().expect("a gene"),
+            GBuilder::new("chr1", 34850361, 34859816)
+                .strand(Strand::Reverse)
+                .id("SMIM12")
+                .transcript_coords(trxs2)
+                .transcript_coding_incl_stop(true)
+                .build().expect("a gene"),
+        ];
+
+        let mut writer = Writer::from_writer(vec![]);
+        for gx in gxs.iter() {
+            writer.write_gene(gx).expect("a successful write");
+        }
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS));
+    }
 }
