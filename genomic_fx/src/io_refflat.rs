@@ -459,18 +459,39 @@ mod test_writer {
 
     use super::*;
 
-    const REFFLAT_SINGLE_ROW_NO_CDS: &'static [u8] =  b"DDX11L1\tNR_046018\tchr1\t+\t11873\t14409\t14409\t14409\t3\t11873,12612,13220,\t12227,12721,14409,
-";
+    const REFFLAT_SINGLE_ROW_NO_CDS: &'static [u8] =  b"DDX11L1\tNR_046018\tchr1\t+\t11873\t14409\t14409\t14409\t3\t11873,12612,13220,\t12227,12721,14409,\n";
 
     #[test]
-    fn records_single_row_no_cds() {
-        let mut writer = Writer::from_writer(vec![]);
-        let rec: RefFlatRow =
+    fn rows_single_row_no_cds() {
+        let row =
             ("DDX11L1".to_owned(), "NR_046018".to_owned(), "chr1".to_owned(),
              '+', 11873, 14409, 14409, 14409, 3,
              "11873,12612,13220,".to_owned(), "12227,12721,14409,".to_owned());
-        let res = writer.write(&rec);
-        assert!(res.is_ok(), "{:?}", res);
+
+        let mut writer = Writer::from_writer(vec![]);
+        writer.write(&row).expect("a successful write");
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
+    }
+
+    #[test]
+    fn records_single_row_no_cds() {
+        let rec = RefFlatRecord {
+            gene_id: "DDX11L1".to_owned(),
+            transcript_name: "NR_046018".to_owned(),
+            seq_name: "chr1".to_owned(),
+            strand_char: '+',
+            trx_start: 11873,
+            trx_end: 14409,
+            coding_start: 14409,
+            coding_end: 14409,
+            num_exons: 3,
+            exon_starts: "11873,12612,13220,".to_owned(),
+            exon_ends: "12227,12721,14409,".to_owned()
+        };
+
+        let mut writer = Writer::from_writer(vec![]);
+        writer.write_record(&rec).expect("a successful write");
         assert_eq!(writer.inner.as_string(),
                    String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
     }
