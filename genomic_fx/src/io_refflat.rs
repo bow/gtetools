@@ -29,7 +29,7 @@ pub struct RefFlatRecord {
     pub gene_id: String,
     pub transcript_name: String,
     pub seq_name: String,
-    pub strand_char: char,
+    pub strand: char,
     pub trx_start: u64,
     pub trx_end: u64,
     pub coding_start: u64,
@@ -49,7 +49,7 @@ impl RefFlatRecord {
                 "number of exon and exon coordinates mismatch"));
         }
 
-        let strand = Strand::from_char(&self.strand_char)
+        let strand = Strand::from_char(&self.strand)
             .map_err(FeatureError::from)
             .map_err(Error::from)?;
 
@@ -94,7 +94,7 @@ impl From<RefFlatRow> for RefFlatRecord {
             gene_id: row.0,
             transcript_name: row.1,
             seq_name: row.2,
-            strand_char: row.3,
+            strand: row.3,
             trx_start: row.4,
             trx_end: row.5,
             coding_start: row.6,
@@ -236,7 +236,7 @@ impl<W: io::Write> Writer<W> {
     pub fn write_record(&mut self, record: &RefFlatRecord) -> Result<(), Error> {
         self.inner
             .encode((&record.gene_id, &record.transcript_name, &record.seq_name,
-                     record.strand_char, record.trx_start, record.trx_end,
+                     record.strand, record.trx_start, record.trx_end,
                      record.coding_start, record.coding_end, record.num_exons,
                      &record.exon_starts, &record.exon_ends))
             .map_err(Error::from)
@@ -296,7 +296,7 @@ type GroupFunc = fn(&Result<RefFlatRecord, Error>) -> GroupKey;
 
 fn groupf(result: &Result<RefFlatRecord, Error>) -> GroupKey {
     result.as_ref().ok()
-        .map(|ref res| (res.gene_id.clone(), res.seq_name.clone(), res.strand_char.clone()))
+        .map(|ref res| (res.gene_id.clone(), res.seq_name.clone(), res.strand.clone()))
 }
 
 
@@ -480,7 +480,7 @@ mod test_writer {
             gene_id: "DDX11L1".to_owned(),
             transcript_name: "NR_046018".to_owned(),
             seq_name: "chr1".to_owned(),
-            strand_char: '+',
+            strand: '+',
             trx_start: 11873,
             trx_end: 14409,
             coding_start: 14409,
