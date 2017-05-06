@@ -243,8 +243,24 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write_transcript(&mut self, transcript: &Transcript) -> Result<(), Error> {
-        let gene_id = transcript.attributes.get("gene_id")
-            .map(|gid| gid.as_ref()).unwrap_or("");
+        self.write_transcript_gid(&transcript, None)
+    }
+
+    pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
+        let gid = gene.id.as_ref().map(|v| v.as_ref());
+        for (_, transcript) in gene.transcripts() {
+            self.write_transcript_gid(&transcript, gid)?;
+        }
+        Ok(())
+    }
+
+    fn write_transcript_gid(&mut self, transcript: &Transcript, gid: Option<&str>)
+    -> Result<(), Error>
+    {
+        let gene_id = match gid {
+            Some(ref gid) => gid,
+            None => transcript.attributes.get("gene_id").map(|gid| gid.as_ref()).unwrap_or(""),
+        };
         let transcript_name = transcript.id.as_ref()
             .map(|tn| tn.as_ref()).unwrap_or("");
         let strand_char = match transcript.strand() {
@@ -263,13 +279,6 @@ impl<W: io::Write> Writer<W> {
                      coding_start, coding_end, transcript.exons().len(),
                      exon_starts, exon_ends))
             .map_err(Error::from)
-    }
-
-    pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
-        for (_, transcript) in gene.transcripts() {
-            self.write_transcript(&transcript)?;
-        }
-        Ok(())
     }
 
     #[inline(always)]
@@ -508,9 +517,168 @@ mod test_writer {
             .expect("a transcript");
 
         let mut writer = Writer::from_writer(vec![]);
-        let res = writer.write_transcript(&trx);
+        writer.write_transcript(&trx).expect("a successful write");
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
+    }
+
+    #[test]
+    fn genes_single_row_no_cds() {
+        let mut cs = HashMap::new();
+        cs.insert("NR_046018".to_owned(),
+                  ((11873, 14409), vec![(11873, 12227), (12612, 12721), (13220, 14409)], None));
+
+        let gx = GBuilder::new("chr1", 11873, 14409)
+            .strand_char('+')
+            .id("DDX11L1")
+            .transcript_coords(cs)
+            .transcript_coding_incl_stop(true)
+            .build()
+            .expect("a gene");
+
+        let mut writer = Writer::from_writer(vec![]);
+        let res = writer.write_gene(&gx);
         assert!(res.is_ok(), "{:?}");
         assert_eq!(writer.inner.as_string(),
                    String::from_utf8_lossy(REFFLAT_SINGLE_ROW_NO_CDS));
+    }
+
+    const REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS: &'static [u8] = b"TNFRSF14\tNM_001297605\tchr1\t+\t2556364\t2565622\t2556664\t2562868\t7\t2556364,2557725,2558342,2559822,2560623,2562864,2563147,\t2556733,2557834,2558468,2559978,2560714,2562896,2565622,
+TNFRSF14\tNM_003820\tchr1\t+\t2556364\t2565622\t2556664\t2563273\t8\t2556364,2557725,2558342,2559822,2560623,2561672,2562864,2563147,\t2556733,2557834,2558468,2559978,2560714,2561815,2562896,2565622,
+SMIM12\tNM_001164824\tchr1\t-\t34850361\t34859045\t34855698\t34855977\t3\t34850361,34856555,34858839,\t34855982,34856739,34859045,
+SMIM12\tNM_001164825\tchr1\t-\t34850361\t34859737\t34855698\t34855977\t2\t34850361,34859454,\t34855982,34859737,
+SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,34859676,\t34855982,34859816,\n";
+
+    #[test]
+    fn records_mult_rows_mult_genes_with_cds() {
+        let recs = vec![
+            RefFlatRecord {
+                gene_id: "TNFRSF14".to_owned(),
+                transcript_name: "NM_001297605".to_owned(),
+                seq_name: "chr1".to_owned(),
+                strand: '+',
+                trx_start: 2556364,
+                trx_end: 2565622,
+                coding_start: 2556664,
+                coding_end: 2562868,
+                num_exons: 7,
+                exon_starts: "2556364,2557725,2558342,2559822,2560623,2562864,2563147,".to_owned(),
+                exon_ends: "2556733,2557834,2558468,2559978,2560714,2562896,2565622,".to_owned(),
+            },
+            RefFlatRecord {
+                gene_id: "TNFRSF14".to_owned(),
+                transcript_name: "NM_003820".to_owned(),
+                seq_name: "chr1".to_owned(),
+                strand: '+',
+                trx_start: 2556364,
+                trx_end: 2565622,
+                coding_start: 2556664,
+                coding_end: 2563273,
+                num_exons: 8,
+                exon_starts:
+                    "2556364,2557725,2558342,2559822,2560623,2561672,2562864,2563147,".to_owned(),
+                exon_ends:
+                    "2556733,2557834,2558468,2559978,2560714,2561815,2562896,2565622,".to_owned(),
+            },
+            RefFlatRecord {
+                gene_id: "SMIM12".to_owned(),
+                transcript_name: "NM_001164824".to_owned(),
+                seq_name: "chr1".to_owned(),
+                strand: '-',
+                trx_start: 34850361,
+                trx_end: 34859045,
+                coding_start: 34855698,
+                coding_end: 34855977,
+                num_exons: 3,
+                exon_starts: "34850361,34856555,34858839,".to_owned(),
+                exon_ends: "34855982,34856739,34859045,".to_owned(),
+            },
+            RefFlatRecord {
+                gene_id: "SMIM12".to_owned(),
+                transcript_name: "NM_001164825".to_owned(),
+                seq_name: "chr1".to_owned(),
+                strand: '-',
+                trx_start: 34850361,
+                trx_end: 34859737,
+                coding_start: 34855698,
+                coding_end: 34855977,
+                num_exons: 2,
+                exon_starts: "34850361,34859454,".to_owned(),
+                exon_ends: "34855982,34859737,".to_owned(),
+            },
+            RefFlatRecord {
+                gene_id: "SMIM12".to_owned(),
+                transcript_name: "NM_138428".to_owned(),
+                seq_name: "chr1".to_owned(),
+                strand: '-',
+                trx_start: 34850361,
+                trx_end: 34859816,
+                coding_start: 34855698,
+                coding_end: 34855977,
+                num_exons: 2,
+                exon_starts: "34850361,34859676,".to_owned(),
+                exon_ends: "34855982,34859816,".to_owned(),
+            },
+        ];
+
+        let mut writer = Writer::from_writer(vec![]);
+        for rec in recs.iter() {
+            writer.write_record(rec).expect("a successful write");
+        }
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS));
+    }
+
+    #[test]
+    fn transcripts_mult_rows_mult_genes_with_cds() {
+        let trxs = vec![
+            TBuilder::new("chr1", 2556364, 2565622)
+                .strand(Strand::Forward)
+                .coords(vec![
+                    (2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
+                    (2560623, 2560714), (2562864, 2562896), (2563147, 2565622)],
+                    Some((2556664, 2562868)))
+                .attribute("gene_id", "TNFRSF14").id("NM_001297605")
+                .coding_incl_stop(true)
+                .build().expect("a transcript"),
+            TBuilder::new("chr1", 2556364, 2565622)
+                .strand(Strand::Forward)
+                .coords(vec![
+                    (2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
+                    (2560623, 2560714), (2561672, 2561815), (2562864, 2562896),
+                    (2563147, 2565622)], Some((2556664, 2563273)))
+                .attribute("gene_id", "TNFRSF14").id("NM_003820")
+                .coding_incl_stop(true)
+                .build().expect("a transcript"),
+            TBuilder::new("chr1", 34850361, 34859045)
+                .strand(Strand::Reverse)
+                .coords(vec![
+                    (34850361, 34855982), (34856555, 34856739), (34858839, 34859045)],
+                    Some((34855698, 34855977)))
+                .attribute("gene_id", "SMIM12").id("NM_001164824")
+                .coding_incl_stop(true)
+                .build().expect("a transcript"),
+            TBuilder::new("chr1", 34850361, 34859737)
+                .strand(Strand::Reverse)
+                .coords(vec![
+                    (34850361, 34855982), (34859454, 34859737)], Some((34855698, 34855977)))
+                .attribute("gene_id", "SMIM12").id("NM_001164825")
+                .coding_incl_stop(true)
+                .build().expect("a transcript"),
+            TBuilder::new("chr1", 34850361, 34859816)
+                .strand(Strand::Reverse)
+                .coords(vec![
+                    (34850361, 34855982), (34859676, 34859816)], Some((34855698, 34855977)))
+                .attribute("gene_id", "SMIM12").id("NM_138428")
+                .coding_incl_stop(true)
+                .build().expect("a transcript"),
+        ];
+
+        let mut writer = Writer::from_writer(vec![]);
+        for trx in trxs.iter() {
+            writer.write_transcript(trx).expect("a successful write");
+        }
+        assert_eq!(writer.inner.as_string(),
+                   String::from_utf8_lossy(REFFLAT_MULT_ROWS_MULT_GENES_WITH_CDS));
     }
 }
