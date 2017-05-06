@@ -1,5 +1,6 @@
 extern crate bio;
 extern crate genomic_fx;
+extern crate linked_hash_map;
 
 use std::collections::HashMap;
 
@@ -12,11 +13,11 @@ fn gbuilder_basic() {
     attribs.insert("key1".to_owned(), "value1".to_owned());
     attribs.insert("key2".to_owned(), "value2".to_owned());
 
-    let mut coords = HashMap::new();
-    coords.insert("trx01".to_owned(),
-                  ((100, 1000), vec![(100, 300), (400, 500), (700, 1000)], Some((200, 800))));
-    coords.insert("trx02".to_owned(),
-                  ((100, 1000), vec![(100, 300), (400, 550), (700, 1000)], Some((150, 900))));
+    let mut coords = Vec::new();
+    coords.push(("trx01".to_owned(),
+                 ((100, 1000), vec![(100, 300), (400, 500), (700, 1000)], Some((200, 800)))));
+    coords.push(("trx02".to_owned(),
+                 ((100, 1000), vec![(100, 300), (400, 550), (700, 1000)], Some((150, 900)))));
 
     let bgx = GBuilder::new("chrT", 100, 1000)
         .strand(Forward)

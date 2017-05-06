@@ -1,6 +1,7 @@
 extern crate bio;
 extern crate csv;
 extern crate itertools;
+extern crate linked_hash_map;
 #[macro_use]
 extern crate quick_error;
 

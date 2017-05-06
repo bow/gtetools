@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use bio::utils::{self, Interval, IntervalError};
 use bio::utils::Strand;
+use linked_hash_map::LinkedHashMap;
 
 use {Coord, Error};
 use self::ExonFeatureKind::*;
@@ -411,14 +412,14 @@ pub struct Gene {
     strand: Strand,
     pub id: Option<String>,
     pub attributes: HashMap<String, String>,
-    transcripts: HashMap<String, Transcript>,
+    transcripts: LinkedHashMap<String, Transcript>,
 }
 
 impl_common!(Gene);
 
 impl Gene {
 
-    pub fn transcripts(&self) -> &HashMap<String, Transcript> {
+    pub fn transcripts(&self) -> &LinkedHashMap<String, Transcript> {
         &self.transcripts
     }
 }
@@ -431,8 +432,8 @@ pub struct GBuilder {
     strand_char: Option<char>,
     id: Option<String>,
     attributes: HashMap<String, String>,
-    transcripts: Option<HashMap<String, Transcript>>,
-    transcript_coords: Option<HashMap<String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>>,
+    transcripts: Option<LinkedHashMap<String, Transcript>>,
+    transcript_coords: Option<Vec<(String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>))>>,
     transcript_coding_incl_stop: bool,
 }
 
@@ -484,14 +485,14 @@ impl GBuilder {
         self
     }
 
-    pub fn transcripts(mut self, transcripts: HashMap<String, Transcript>) -> Self {
+    pub fn transcripts(mut self, transcripts: LinkedHashMap<String, Transcript>) -> Self {
         self.transcripts = Some(transcripts);
         self
     }
 
     pub fn transcript_coords(
         mut self,
-        transcript_coords: HashMap<String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>
+        transcript_coords: Vec<(String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>))>
     )-> Self
     {
         self.transcript_coords = Some(transcript_coords);
@@ -635,38 +636,37 @@ fn resolve_transcripts_input(
     gene_seqname: &String,
     gene_interval: &Interval<u64>,
     gene_strand: &Strand,
-    transcripts: Option<HashMap<String, Transcript>>,
-    transcript_coords: Option<HashMap<String,
-                                      (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>)>>,
+    transcripts: Option<LinkedHashMap<String, Transcript>>,
+    transcript_coords: Option<Vec<(String,
+                                   (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>))>>,
     transcript_coding_incl_stop: bool
-) -> Result<HashMap<String, Transcript>, Error>
+) -> Result<LinkedHashMap<String, Transcript>, Error>
 {
     match (transcripts, transcript_coords) {
         // nothing defined -> the gene doesn't have any known transcripts
-        (None, None) => Ok(HashMap::new()),
+        (None, None) => Ok(LinkedHashMap::new()),
 
         // transcript defined, return it
         (Some(trxs), _) => Ok(trxs),
 
         // transcripts coords defined, create transcripts
         (None, Some(trxs_coords)) => {
-            trxs_coords.into_iter()
-                .map(|(trx_id, (trx_coord, exon_coords, coding_coord))| {
+            let mut trxs = LinkedHashMap::new();
+            for (trx_id, (trx_coord, exon_coords, coding_coord)) in trxs_coords.into_iter() {
 
-                    if trx_coord.0 < gene_interval.start || trx_coord.1 > gene_interval.end {
-                        return Err(
-                            Error::Feature(FeatureError::TranscriptNotFullyEnveloped));
-                    }
+                if trx_coord.0 < gene_interval.start || trx_coord.1 > gene_interval.end {
+                    return Err(Error::Feature(FeatureError::TranscriptNotFullyEnveloped));
+                }
 
-                    TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
-                        .strand(*gene_strand)
-                        .id(trx_id.clone())
-                        .coords(exon_coords, coding_coord)
-                        .coding_incl_stop(transcript_coding_incl_stop)
-                        .build()
-                        .map(|trx| (trx_id, trx))
-                })
-                .collect()
+                let trx = TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
+                    .strand(*gene_strand)
+                    .id(trx_id.clone())
+                    .coords(exon_coords, coding_coord)
+                    .coding_incl_stop(transcript_coding_incl_stop)
+                    .build()?;
+                trxs.insert(trx_id, trx);
+            }
+            Ok(trxs)
         },
     }
 }

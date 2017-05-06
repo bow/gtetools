@@ -4,8 +4,6 @@ extern crate test;
 extern crate genomic_fx;
 extern crate bio;
 
-use std::collections::HashMap;
-
 use bio::utils::{Interval, Strand};
 use test::Bencher;
 
@@ -126,8 +124,8 @@ mod tests {
     #[bench]
     fn gbuilder_3_transcripts_with_cds(b: &mut Bencher) {
         b.iter(|| {
-            let mut coords = HashMap::new();
-            coords.insert(
+            let mut coords = Vec::new();
+            coords.push((
                 "trx01".to_owned(),
                 ((100, 10000),
                 vec![
@@ -135,8 +133,8 @@ mod tests {
                     (1100, 1300), (1400, 1500), (1700, 2000),
                     (2100, 2300), (2400, 2500), (2700, 3000),
                     (3000, 6000), (7000, 8000), (9000, 10000)],
-                Some((200, 9500))));
-            coords.insert(
+                Some((200, 9500)))));
+            coords.push((
                 "trx02".to_owned(),
                 ((100, 10000),
                 vec![
@@ -144,8 +142,8 @@ mod tests {
                     (1100, 1300), (1400, 1500), (1700, 2000),
                     (2100, 2300), (2400, 2500), (2700, 3000),
                     (3000, 6000), (7000, 8000), (9000, 10000)],
-                Some((200, 9500))));
-            coords.insert(
+                Some((200, 9500)))));
+            coords.push((
                 "trx03".to_owned(),
                 ((100, 10000),
                 vec![
@@ -153,7 +151,7 @@ mod tests {
                     (1100, 1300), (1400, 1500), (1700, 2000),
                     (2100, 2300), (2400, 2500), (2700, 3000),
                     (3000, 6000), (7000, 8000), (9000, 10000)],
-                Some((200, 9500))));
+                Some((200, 9500)))));
             GBuilder::new("chrT", 100, 20000)
                 .strand(Strand::Forward)
                 .id("gx01")

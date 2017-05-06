@@ -9,7 +9,6 @@
 
 
 use std::cmp::{max, min};
-use std::collections::HashMap;
 use std::convert::AsRef;
 use std::io;
 use std::fs;
@@ -18,6 +17,7 @@ use std::str::FromStr;
 
 use csv;
 use itertools::{GroupBy, Itertools};
+use linked_hash_map::LinkedHashMap;
 
 use feature::FeatureError;
 use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, Error};
@@ -189,7 +189,7 @@ impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
             .map(|(okey, records)| {
                 match okey {
                     Some((gid, seq_name, strand_char)) => {
-                        let mut transcripts = HashMap::new();
+                        let mut transcripts = LinkedHashMap::new();
                         let (mut gene_start, mut gene_end) = (u64::max_value(), u64::min_value());
                         for record in records {
                             let transcript = record.and_then(|rec| rec.into_transcript())?;
@@ -524,9 +524,9 @@ mod test_writer {
 
     #[test]
     fn genes_single_row_no_cds() {
-        let mut cs = HashMap::new();
-        cs.insert("NR_046018".to_owned(),
-                  ((11873, 14409), vec![(11873, 12227), (12612, 12721), (13220, 14409)], None));
+        let mut cs = Vec::new();
+        cs.push(("NR_046018".to_owned(),
+                 ((11873, 14409), vec![(11873, 12227), (12612, 12721), (13220, 14409)], None)));
 
         let gx = GBuilder::new("chr1", 11873, 14409)
             .strand_char('+')
