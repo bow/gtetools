@@ -41,7 +41,7 @@ pub struct RefFlatRecord {
 
 impl RefFlatRecord {
 
-    pub fn to_transcript(self) -> Result<Transcript, Error> {
+    pub fn into_transcript(self) -> Result<Transcript, Error> {
 
         let exon_coords = self.zip_raw_exon_coords()?;
         if exon_coords.len() != self.num_exons {
@@ -172,7 +172,7 @@ impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Result<Transcript, Error>> {
         self.inner.next()
-            .map(|record| record.and_then(|rec| rec.to_transcript()))
+            .map(|record| record.and_then(|rec| rec.into_transcript()))
     }
 }
 
@@ -192,7 +192,7 @@ impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
                         let mut transcripts = HashMap::new();
                         let (mut gene_start, mut gene_end) = (u64::max_value(), u64::min_value());
                         for record in records {
-                            let transcript = record.and_then(|rec| rec.to_transcript())?;
+                            let transcript = record.and_then(|rec| rec.into_transcript())?;
                             gene_start = min(gene_start, transcript.interval().start);
                             gene_end = max(gene_end, transcript.interval().end);
                             let tid = transcript.id.clone()
