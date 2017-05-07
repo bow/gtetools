@@ -16,7 +16,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use csv;
-use itertools::{GroupBy, Itertools};
+use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
 use feature::FeatureError;
@@ -134,7 +134,7 @@ impl<R: io::Read> Reader<R> {
 
     pub fn genes<'a>(&'a mut self) -> RefFlatGenes<'a, R> {
         RefFlatGenes {
-            inner: self.records().group_by(groupf),
+            inner: self.records().group_by(RefFlatGenes::<'a, R>::group_func),
         }
     }
 }
@@ -176,8 +176,49 @@ impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
     }
 }
 
+type GroupKey = Option<(String, String, char)>;
+
+type GroupFunc = fn(&Result<RefFlatRecord, Error>) -> GroupKey;
+
+type GroupedRecords<'a, 'b, R> = Group<'b, GroupKey, RefFlatRecords<'a, R>, GroupFunc>;
+
 pub struct RefFlatGenes<'a, R: 'a> where R: io::Read, {
     inner: GroupBy<GroupKey, RefFlatRecords<'a, R>, GroupFunc>,
+}
+
+impl<'a, R> RefFlatGenes<'a, R> where R: io::Read {
+
+    fn group_func(result: &Result<RefFlatRecord, Error>) -> GroupKey {
+        result.as_ref().ok()
+            .map(|ref res| (res.gene_id.clone(), res.seq_name.clone(), res.strand.clone()))
+    }
+
+    fn group_to_gene<'b>(group: (GroupKey, GroupedRecords<'a, 'b, R>)) -> Result<Gene, Error> {
+        let (group_key, records) = group;
+        match group_key {
+
+            None => Err(records.filter_map(|x| x.err()).next().unwrap()),
+
+            Some((gid, seq_name, strand_char)) => {
+                let mut transcripts = LinkedHashMap::new();
+                let (mut gene_start, mut gene_end) = (u64::max_value(), u64::min_value());
+                for record in records {
+                    let transcript = record.and_then(|rec| rec.into_transcript())?;
+                    gene_start = min(gene_start, transcript.interval().start);
+                    gene_end = max(gene_end, transcript.interval().end);
+                    let tid = transcript.id.clone()
+                        .ok_or(Error::RefFlat("transcript does not have ID"))?;
+                    transcripts.insert(tid, transcript);
+                }
+                GBuilder::new(seq_name, gene_start, gene_end)
+                    .id(gid)
+                    .strand_char(strand_char)
+                    .transcripts(transcripts)
+                    .transcript_coding_incl_stop(true)
+                    .build()
+            },
+        }
+    }
 }
 
 impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
@@ -185,30 +226,7 @@ impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
     type Item = Result<Gene, Error>;
 
     fn next(&mut self) -> Option<Result<Gene, Error>> {
-        self.inner.into_iter()
-            .map(|(okey, records)| {
-                match okey {
-                    Some((gid, seq_name, strand_char)) => {
-                        let mut transcripts = LinkedHashMap::new();
-                        let (mut gene_start, mut gene_end) = (u64::max_value(), u64::min_value());
-                        for record in records {
-                            let transcript = record.and_then(|rec| rec.into_transcript())?;
-                            gene_start = min(gene_start, transcript.interval().start);
-                            gene_end = max(gene_end, transcript.interval().end);
-                            let tid = transcript.id.clone()
-                                .ok_or(Error::RefFlat("transcript does not have ID"))?;
-                            transcripts.insert(tid, transcript);
-                        }
-                        GBuilder::new(seq_name, gene_start, gene_end)
-                            .id(gid)
-                            .strand_char(strand_char)
-                            .transcripts(transcripts)
-                            .transcript_coding_incl_stop(true)
-                            .build()
-                    },
-                    None => Err(records.filter_map(|x| x.err()).next().unwrap())
-                }
-            }).next()
+        self.inner.into_iter().map(Self::group_to_gene).next()
     }
 }
 
@@ -297,15 +315,6 @@ impl Writer<fs::File> {
         let f = fs::File::create(path).map_err(Error::from)?;
         Ok(Writer::from_writer(f))
     }
-}
-
-type GroupKey = Option<(String, String, char)>;
-
-type GroupFunc = fn(&Result<RefFlatRecord, Error>) -> GroupKey;
-
-fn groupf(result: &Result<RefFlatRecord, Error>) -> GroupKey {
-    result.as_ref().ok()
-        .map(|ref res| (res.gene_id.clone(), res.seq_name.clone(), res.strand.clone()))
 }
 
 
