@@ -5,7 +5,7 @@ use bio::utils::{self, Interval, IntervalError};
 use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 
-use {Coord, Error};
+use {Coord, Error, RawTrxCoord};
 use self::ExonFeatureKind::*;
 
 
@@ -433,7 +433,7 @@ pub struct GBuilder {
     id: Option<String>,
     attributes: HashMap<String, String>,
     transcripts: Option<LinkedHashMap<String, Transcript>>,
-    transcript_coords: Option<Vec<(String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>))>>,
+    transcript_coords: Option<LinkedHashMap<String, RawTrxCoord>>,
     transcript_coding_incl_stop: bool,
 }
 
@@ -490,12 +490,8 @@ impl GBuilder {
         self
     }
 
-    pub fn transcript_coords(
-        mut self,
-        transcript_coords: Vec<(String, (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>))>
-    )-> Self
-    {
-        self.transcript_coords = Some(transcript_coords);
+    pub fn transcript_coords(mut self, coords: LinkedHashMap<String, RawTrxCoord>)-> Self {
+        self.transcript_coords = Some(coords);
         self
     }
 
@@ -637,8 +633,7 @@ fn resolve_transcripts_input(
     gene_interval: &Interval<u64>,
     gene_strand: &Strand,
     transcripts: Option<LinkedHashMap<String, Transcript>>,
-    transcript_coords: Option<Vec<(String,
-                                   (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>))>>,
+    transcript_coords: Option<LinkedHashMap<String, RawTrxCoord>>,
     transcript_coding_incl_stop: bool
 ) -> Result<LinkedHashMap<String, Transcript>, Error>
 {

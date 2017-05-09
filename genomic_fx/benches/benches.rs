@@ -1,11 +1,14 @@
 #![feature(test)]
 
-extern crate test;
-extern crate genomic_fx;
 extern crate bio;
+extern crate genomic_fx;
+extern crate linked_hash_map;
+extern crate test;
+
+use test::Bencher;
 
 use bio::utils::{Interval, Strand};
-use test::Bencher;
+use linked_hash_map::LinkedHashMap;
 
 use genomic_fx::{ExonFeature, ExonFeatureKind, EBuilder, TBuilder, GBuilder, RefFlatReader};
 use ExonFeatureKind::*;
@@ -124,8 +127,8 @@ mod tests {
     #[bench]
     fn gbuilder_3_transcripts_with_cds(b: &mut Bencher) {
         b.iter(|| {
-            let mut coords = Vec::new();
-            coords.push((
+            let mut coords = LinkedHashMap::new();
+            coords.insert(
                 "trx01".to_owned(),
                 ((100, 10000),
                 vec![
@@ -133,8 +136,8 @@ mod tests {
                     (1100, 1300), (1400, 1500), (1700, 2000),
                     (2100, 2300), (2400, 2500), (2700, 3000),
                     (3000, 6000), (7000, 8000), (9000, 10000)],
-                Some((200, 9500)))));
-            coords.push((
+                Some((200, 9500))));
+            coords.insert(
                 "trx02".to_owned(),
                 ((100, 10000),
                 vec![
@@ -142,8 +145,8 @@ mod tests {
                     (1100, 1300), (1400, 1500), (1700, 2000),
                     (2100, 2300), (2400, 2500), (2700, 3000),
                     (3000, 6000), (7000, 8000), (9000, 10000)],
-                Some((200, 9500)))));
-            coords.push((
+                Some((200, 9500))));
+            coords.insert(
                 "trx03".to_owned(),
                 ((100, 10000),
                 vec![
@@ -151,7 +154,7 @@ mod tests {
                     (1100, 1300), (1400, 1500), (1700, 2000),
                     (2100, 2300), (2400, 2500), (2700, 3000),
                     (3000, 6000), (7000, 8000), (9000, 10000)],
-                Some((200, 9500)))));
+                Some((200, 9500))));
             GBuilder::new("chrT", 100, 20000)
                 .strand(Strand::Forward)
                 .id("gx01")

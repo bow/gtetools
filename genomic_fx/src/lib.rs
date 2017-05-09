@@ -53,3 +53,6 @@ quick_error! {
 
 // Helper type for raw coordinates
 type Coord<T> = (T, T);
+
+// Helper type alias for raw transcript coordinate inputs
+type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);

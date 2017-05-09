@@ -1,7 +1,10 @@
 extern crate bio;
+extern crate linked_hash_map;
 extern crate genomic_fx;
 
 use std::io;
+
+use linked_hash_map::LinkedHashMap;
 
 use genomic_fx::{RefFlatReader, RefFlatWriter, RefFlatRecord,
                  RefFlatRecords, RefFlatTranscripts, RefFlatGenes,
@@ -202,9 +205,9 @@ fn refflat_writer_transcripts_single_row_no_cds() {
 
 #[test]
 fn refflat_writer_genes_single_row_no_cds() {
-    let mut cs = Vec::new();
-    cs.push(("NR_046018".to_owned(),
-             ((11873, 14409), vec![(11873, 12227), (12612, 12721), (13220, 14409)], None)));
+    let mut cs = LinkedHashMap::new();
+    cs.insert("NR_046018".to_owned(),
+              ((11873, 14409), vec![(11873, 12227), (12612, 12721), (13220, 14409)], None));
 
     let gx = GBuilder::new("chr1", 11873, 14409)
         .strand_char('+')
@@ -353,37 +356,37 @@ fn refflat_writer_transcripts_mult_rows_mult_genes_with_cds() {
 
 #[test]
 fn refflat_writer_genes_mult_rows_mult_genes_with_cds() {
-    let mut trxs1 = Vec::new();
-    trxs1.push((
+    let mut trxs1 = LinkedHashMap::new();
+    trxs1.insert(
         "NM_001297605".to_owned(),
         ((2556364, 2565622),
             vec![(2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
                 (2560623, 2560714), (2562864, 2562896), (2563147, 2565622)],
-            Some((2556664, 2562868)))));
+            Some((2556664, 2562868))));
 
-    trxs1.push((
+    trxs1.insert(
         "NM_003820".to_owned(),
         ((2556364, 2565622),
         vec![(2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
                 (2560623, 2560714), (2561672, 2561815), (2562864, 2562896), (2563147, 2565622)],
-        Some((2556664, 2563273)))));
+        Some((2556664, 2563273))));
 
-    let mut trxs2 = Vec::new();
-    trxs2.push((
+    let mut trxs2 = LinkedHashMap::new();
+    trxs2.insert(
         "NM_001164824".to_owned(),
         ((34850361, 34859045),
         vec![(34850361, 34855982), (34856555, 34856739), (34858839, 34859045)],
-        Some((34855698, 34855977)))));
+        Some((34855698, 34855977))));
 
-    trxs2.push((
+    trxs2.insert(
         "NM_001164825".to_owned(),
         ((34850361, 34859737), vec![(34850361, 34855982), (34859454, 34859737)],
-        Some((34855698, 34855977)))));
+        Some((34855698, 34855977))));
 
-    trxs2.push((
+    trxs2.insert(
         "NM_138428".to_owned(),
         ((34850361, 34859816), vec![(34850361, 34855982), (34859676, 34859816)],
-        Some((34855698, 34855977)))));
+        Some((34855698, 34855977))));
 
     let gxs = [
         GBuilder::new("chr1", 2556364, 2565622)
