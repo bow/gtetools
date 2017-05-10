@@ -9,6 +9,7 @@ use std::io::Error as StdIoError;
 use std::num::ParseIntError;
 
 pub use bio::utils::Strand;
+pub use bio::io::gff::GffType;
 use csv::Error as CsvError;
 
 mod feature;
@@ -22,6 +23,10 @@ pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
                      RefFlatRow, RefFlatRecord,
                      RefFlatRecords, RefFlatTranscripts, RefFlatGenes};
 
+mod io_gff;
+pub use io_gff::{Reader as GffReader,
+                 GffGenes};
+
 quick_error! {
     #[derive(Debug)]
     pub enum Error {
@@ -31,6 +36,9 @@ quick_error! {
             cause(err)
         }
         RefFlat(string: &'static str) {
+            description(string)
+        }
+        Gff(string: &'static str) {
             description(string)
         }
         Csv(err: CsvError) {
