@@ -56,9 +56,9 @@ pub enum ExonFeatureKind {
     UTR,
     UTR5,
     UTR3,
-    CDS { frame: Option<u64> },
-    StartCodon { frame: Option<u64> },
-    StopCodon { frame: Option<u64> },
+    CDS { frame: Option<u8> },
+    StartCodon { frame: Option<u8> },
+    StopCodon { frame: Option<u8> },
     Any(String),
 }
 
@@ -1190,10 +1190,13 @@ where T: Iterator<Item=&'a mut Exon>
 
 #[inline(always)]
 // Adapted from: http://mblab.wustl.edu/GTF22.html
-fn calc_next_frame(cur_span: u64, cur_frame: u64) -> u64 {
-    if cur_span >= cur_frame {
-        (3 - ((cur_span - cur_frame) % 3)) % 3
-    } else {
-        (3 - (cur_frame - cur_span) % 3)
-    }
+fn calc_next_frame(cur_span: u64, cur_frame: u8) -> u8 {
+    let cast_cur_frame = cur_frame as u64;
+    let result =
+        if cur_span >= cast_cur_frame {
+            (3 - ((cur_span - cast_cur_frame) % 3)) % 3
+        } else {
+            (3 - (cast_cur_frame - cur_span) % 3)
+        };
+    result as u8
 }
