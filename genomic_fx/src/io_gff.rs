@@ -9,7 +9,6 @@ use bio::io::gff::{self, GffType};
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
-// use feature::FeatureError;
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, Error};
 
 // Various commonly-used feature column values
@@ -22,11 +21,16 @@ const UTR3_STR: &'static str = "UTR3";
 const CDS_STR: &'static str = "CDS";
 const START_CODON_STR: &'static str = "start_codon";
 const STOP_CODON_STR: &'static str = "stop_codon";
+
 // Value for unknown columns.
 const UNK_STR: &'static str = ".";
+
 // Commonly-used attribute keys.
 const GENE_ID_STR: &'static str = "gene_id";
 const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
+
+// Initial coordinate for features.
+const INIT_COORD: (u64, u64) = (::std::u64::MAX, ::std::u64::MIN);
 
 
 pub struct Reader<R: io::Read> {
@@ -41,13 +45,13 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    pub fn genes<'a>(&'a mut self) -> GffGenes<'a, R> {
+    pub fn genes(&mut self) -> GffGenes<R> {
         GffGenes {
-            inner: self.records().group_by(GffGenes::<'a, R>::gene_groupf),
+            inner: self.records().group_by(GffGenes::<R>::gene_groupf),
         }
     }
 
-    fn records<'a>(&'a mut self) -> GffRecords<'a, R> {
+    fn records(&mut self) -> GffRecords<R> {
         GffRecords {
             inner: self.inner.records()
         }
@@ -87,14 +91,6 @@ type GxGroupFunc = fn(&Result<gff::Record, Error>) -> GxGroupKey;
 type GxGroupedRecs<'a, 'b, R> = Group<'b, GxGroupKey, GffRecords<'a, R>, GxGroupFunc>;
 
 type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
-
-const INIT_COORD: (u64, u64) = (::std::u64::MAX, ::std::u64::MIN);
-
-#[inline(always)]
-fn adjust_coord(cur_coord: Coord<u64>, record: &gff::Record) -> Coord<u64> {
-    (min(cur_coord.0, *record.start() - 1),
-     max(cur_coord.1, *record.end()))
-}
 
 impl<'a, R> GffGenes<'a, R> where R: io::Read {
 
@@ -345,6 +341,11 @@ impl<W: io::Write> Writer<W> {
         }
         Ok(())
     }
+
+#[inline(always)]
+fn adjust_coord(cur_coord: Coord<u64>, record: &gff::Record) -> Coord<u64> {
+    (min(cur_coord.0, *record.start() - 1),
+     max(cur_coord.1, *record.end()))
 }
 
 #[inline(always)]

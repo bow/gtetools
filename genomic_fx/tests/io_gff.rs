@@ -12,7 +12,7 @@ use Strand::*;
 static SINGLE_GENE_GTF: &'static str = include_str!("data/single_gene.gtf");
 
 
-fn next_gx<'a, R>(rg: &mut GffGenes<'a, R>) -> Gene where R: io::Read {
+fn next_gx<R>(rg: &mut GffGenes<R>) -> Gene where R: io::Read {
     rg.next().expect("a gene result").expect("a gene")
 }
 
