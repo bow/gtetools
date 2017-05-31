@@ -83,7 +83,7 @@ impl FeatureKind for GeneFeatureKind {}
 
 pub type GeneFeature = Feature<GeneFeatureKind>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Exon {
     seq_name: String,
     interval: Interval<u64>,
@@ -179,7 +179,7 @@ impl EBuilder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Transcript {
     seq_name: String,
     interval: Interval<u64>,
@@ -409,7 +409,7 @@ impl TBuilder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Gene {
     seq_name: String,
     interval: Interval<u64>,
