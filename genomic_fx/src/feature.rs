@@ -197,6 +197,10 @@ impl Transcript {
         self.exons.as_slice()
     }
 
+    pub fn into_exons(self) -> Vec<Exon> {
+        self.exons
+    }
+
     pub fn coding_coord(&self, incl_stop: bool) -> Option<Coord<u64>> {
         let start = self.coding_start_coord(incl_stop);
         let end = self.coding_end_coord(incl_stop);
@@ -421,6 +425,10 @@ impl Gene {
 
     pub fn transcripts(&self) -> &LinkedHashMap<String, Transcript> {
         &self.transcripts
+    }
+
+    pub fn into_transcripts(self) -> LinkedHashMap<String, Transcript> {
+        self.transcripts
     }
 }
 
