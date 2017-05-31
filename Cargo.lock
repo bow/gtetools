@@ -21,8 +21,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bio"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.13.0"
+source = "git+https://github.com/bow/rust-bio.git?rev=ef66f770#ef66f770d6f8db910efd81eb4959e21b62ec2baf"
 dependencies = [
  "approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -106,7 +106,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "genomic_fx"
 version = "0.1.0"
 dependencies = [
- "bio 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bio 0.13.0 (git+https://github.com/bow/rust-bio.git?rev=ef66f770)",
  "csv 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "linked-hash-map 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -455,7 +455,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [metadata]
 "checksum aho-corasick 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "500909c4f87a9e52355b26626d890833e9e1d53ac566db76c36faa984b889699"
 "checksum approx 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "08abcc3b4e9339e33a3d0a5ed15d84a687350c05689d825e0f6655eef9e76a94"
-"checksum bio 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "50cbecea1f156d7512743cce6594b47f3b854e968d4ad9d410cb866ee7cca3fc"
+"checksum bio 0.13.0 (git+https://github.com/bow/rust-bio.git?rev=ef66f770)" = "<none>"
 "checksum bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d9bf6104718e80d7b26a68fdbacff3481cfc05df670821affc7e9cbc1884400c"
 "checksum bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5b97c2c8e8bbb4251754f559df8af22fb264853c7d009084a576cdf12565089d"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"

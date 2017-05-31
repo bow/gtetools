@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::cmp::{max, min};
 use std::convert::AsRef;
 use std::io;
@@ -9,7 +10,23 @@ use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
 // use feature::FeatureError;
-use {Coord, Gene, GBuilder, Strand, Error};
+use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, Error};
+
+// Various commonly-used feature column values
+const GENE_STR: &'static str = "gene";
+const TRANSCRIPT_STR: &'static str = "transcript";
+const EXON_STR: &'static str = "exon";
+const UTR_STR: &'static str = "UTR";
+const UTR5_STR: &'static str = "UTR5";
+const UTR3_STR: &'static str = "UTR3";
+const CDS_STR: &'static str = "CDS";
+const START_CODON_STR: &'static str = "start_codon";
+const STOP_CODON_STR: &'static str = "stop_codon";
+// Value for unknown columns.
+const UNK_STR: &'static str = ".";
+// Commonly-used attribute keys.
+const GENE_ID_STR: &'static str = "gene_id";
+const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
 
 
 pub struct Reader<R: io::Read> {
@@ -84,7 +101,7 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
     fn gene_groupf(result: &Result<gff::Record, Error>) -> GxGroupKey {
         result.as_ref().ok()
             .map(|res| {
-                let gene_id = res.attributes().get("gene_id")
+                let gene_id = res.attributes().get(GENE_ID_STR)
                     .map(|gid| gid.as_str())
                     .unwrap_or("");
                 let seq_name = String::from(res.seqname());
@@ -108,26 +125,26 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
                 for record in records {
 
                     let mut rec = record?;
-                    rec.attributes_mut().remove("gene_id");
+                    rec.attributes_mut().remove(GENE_ID_STR);
 
                     let rtrx_entry = rec.attributes_mut()
-                        .remove("transcript_id")
+                        .remove(TRANSCRIPT_ID_STR)
                         .ok_or(Error::Gff("required 'transcript_id' attribute not found"))
                         .map(|id| trx_coords.entry(id).or_insert((INIT_COORD, vec![], None)));
 
                     match rec.feature_type() {
-                        "gene" => {
+                        GENE_STR => {
                             gene_coord = adjust_coord(gene_coord, &rec);
                         },
-                        "transcript" => {
+                        TRANSCRIPT_STR => {
                             let trx_entry = rtrx_entry?;
                             trx_entry.0 = adjust_coord(trx_entry.0, &rec);
                         },
-                        "exon" => {
+                        EXON_STR => {
                             let trx_entry = rtrx_entry?;
                             (trx_entry.1).push((*rec.start() - 1, *rec.end()));
                         },
-                        "cds" | "CDS" => {
+                        CDS_STR => {
                             let trx_entry = rtrx_entry?;
                             trx_entry.2 = (trx_entry.2).or(Some(INIT_COORD))
                                 .map(|coord| adjust_coord(coord, &rec));
@@ -153,5 +170,206 @@ impl<'a, R> Iterator for GffGenes<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Result<Gene, Error>> {
         self.inner.into_iter().map(Self::group_to_gene).next()
+    }
+}
+
+struct GffRow(String, String, String, u64, u64, String, String, String, HashMap<String, String>);
+
+
+impl From<GffRow> for gff::Record {
+    fn from(row: GffRow) -> Self {
+        let mut rec = gff::Record::default();
+        *rec.seqname_mut() = row.0;
+        *rec.source_mut() = row.1;
+        *rec.feature_type_mut() = row.2;
+        *rec.start_mut() = row.3 + 1;
+        *rec.end_mut() = row.4;
+        *rec.score_mut() = row.5;
+        *rec.strand_mut() = row.6;
+        *rec.frame_mut() = row.7;
+        *rec.attributes_mut() = row.8;
+        rec
+    }
+}
+
+impl Gene {
+
+    #[inline(always)]
+    fn num_records(&self) -> usize {
+        1 + self.transcripts().values()
+            .map(|ref trx| trx.num_records())
+            .fold(0, |acc, x| acc + x)
+    }
+
+    // TODO: also handle gene-level features
+    fn to_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
+
+        let (source, score) = extract_source_score(&mut self.attributes);
+        let strand = strand_to_string(self.strand());
+        let gene_id = match self.id.take() {
+            Some(gid) => {
+                self.attributes.insert(GENE_ID_STR.to_owned(), gid.clone());
+                gid
+            },
+            None =>  {
+                self.attributes.get(GENE_ID_STR)
+                    .ok_or(Error::Gff("required 'gene_id' attribute not found"))
+                    .map(|gid| gid.clone())?
+            },
+        };
+
+        let mut recs = Vec::with_capacity(self.num_records());
+
+        let row = GffRow(
+            self.seq_name().to_owned(), source, GENE_STR.to_owned(),
+            self.interval().start, self.interval().end, score, strand.to_owned(),
+            UNK_STR.to_owned(), self.attributes.clone());
+        recs.push(gff::Record::from(row));
+
+        for (_, mut transcript) in self.into_transcripts() {
+            let mut trx_recs = transcript.to_gff_records(gene_id.as_str())?;
+            recs.append(&mut trx_recs);
+        }
+
+        Ok(recs)
+    }
+}
+
+impl Transcript {
+
+    #[inline(always)]
+    fn num_records(&self) -> usize {
+        1 + self.exons().iter()
+            .map(|ref exn| 1 + exn.features.len())
+            .fold(0, |acc, x| acc + x)
+    }
+
+    // TODO: also handle transcript-level features
+    fn to_gff_records(mut self, gene_id: &str) -> Result<Vec<gff::Record>, Error> {
+
+        self.attributes.insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
+        let (source, score) = extract_source_score(&mut self.attributes);
+        let strand = strand_to_string(self.strand());
+        let transcript_id = match self.id.take() {
+            Some(tid) => {
+                self.attributes.insert(TRANSCRIPT_ID_STR.to_owned(), tid.clone());
+                tid
+            },
+            None =>  {
+                self.attributes.get(TRANSCRIPT_ID_STR)
+                    .ok_or(Error::Gff("required 'transcript_id' attribute not found"))
+                    .map(|tid| tid.clone())?
+            },
+        };
+
+        let mut recs = Vec::with_capacity(self.num_records());
+
+        let trx_row =
+            GffRow(self.seq_name().to_owned(), source, TRANSCRIPT_STR.to_owned(),
+                   self.interval().start, self.interval().end, score,
+                   strand.to_owned(), UNK_STR.to_owned(), self.attributes.clone());
+        recs.push(gff::Record::from(trx_row));
+
+        for exon in self.into_exons() {
+            let mut exon_recs = exon.to_gff_records(gene_id, transcript_id.as_str())?;
+            recs.append(&mut exon_recs);
+        }
+
+        Ok(recs)
+    }
+}
+
+impl EFK {
+
+    #[inline(always)]
+    fn get_feature_frame(&self) -> (String, String) {
+        let (feature, frame) = match self {
+            &EFK::UTR => (UTR_STR, UNK_STR),
+            &EFK::UTR5 => (UTR5_STR, UNK_STR),
+            &EFK::UTR3 => (UTR3_STR, UNK_STR),
+            &EFK::CDS { frame: ref f } => (CDS_STR, frame_to_str(f)),
+            &EFK::StopCodon { frame: ref f } => (STOP_CODON_STR, frame_to_str(f)),
+            &EFK::StartCodon { frame: ref f } => (START_CODON_STR, frame_to_str(f)),
+            &EFK::Any(ref s) => (s.as_str(), UNK_STR),
+        };
+        (feature.to_owned(), frame.to_owned())
+    }
+}
+
+impl Exon {
+
+    fn to_gff_records(mut self, gene_id: &str, transcript_id: &str
+    ) -> Result<Vec<gff::Record>, Error> {
+
+        self.attributes.insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
+        self.attributes.insert(TRANSCRIPT_ID_STR.to_owned(), transcript_id.to_owned());
+        let (source, score) = extract_source_score(&mut self.attributes);
+        let strand = strand_to_string(self.strand());
+
+        let mut recs = Vec::with_capacity(1 + self.features.len());
+
+        let exon_row =
+            GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
+                   self.interval().start, self.interval().end, score, strand.to_owned(),
+                   UNK_STR.to_owned(), self.attributes.clone());
+        recs.push(gff::Record::from(exon_row));
+
+        for fx in self.features.iter() {
+            let (feature, frame) = fx.kind.get_feature_frame();
+            let fx_row =
+                GffRow(self.seq_name().to_owned(), source.clone(), feature,
+                       self.interval().start, self.interval().end, UNK_STR.to_owned(),
+                       strand.to_owned(), UNK_STR.to_owned(), self.attributes.clone());
+            recs.push(gff::Record::from(fx_row));
+        }
+
+        Ok(recs)
+    }
+}
+
+pub struct Writer<W: io::Write> {
+    inner: gff::Writer<W>,
+}
+
+impl<W: io::Write> Writer<W> {
+
+    pub fn from_writer(in_writer: W, gff_type: GffType) -> Writer<W> {
+        Writer {
+            inner: gff::Writer::new(in_writer, gff_type),
+        }
+    }
+
+    pub fn write_gene(&mut self, mut gene: Gene) -> Result<(), Error> {
+        for record in gene.to_gff_records()?.iter() {
+            self.inner.write(&record)?;
+        }
+        Ok(())
+    }
+}
+
+#[inline(always)]
+fn extract_source_score(attributes: &mut HashMap<String, String>) -> (String, String) {
+    let source = attributes.remove("source").unwrap_or(UNK_STR.to_owned());
+    let score = attributes.remove("score").unwrap_or(UNK_STR.to_owned());
+    (source, score)
+}
+
+#[inline(always)]
+fn strand_to_string(strand: &Strand) -> String {
+    let value = match strand {
+        &Strand::Forward => "+",
+        &Strand::Reverse => "-",
+        &Strand::Unknown => UNK_STR,
+    };
+    value.to_owned()
+}
+
+#[inline(always)]
+fn frame_to_str(frame: &Option<u8>) -> &str {
+    match frame {
+        &Some(0) => "0",
+        &Some(1) => "1",
+        &Some(2) => "2",
+        _ => UNK_STR,
     }
 }
