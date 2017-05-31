@@ -341,6 +341,7 @@ impl<W: io::Write> Writer<W> {
         }
         Ok(())
     }
+}
 
 #[inline(always)]
 fn adjust_coord(cur_coord: Coord<u64>, record: &gff::Record) -> Coord<u64> {
