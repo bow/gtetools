@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::cmp::{max, min};
 use std::convert::AsRef;
 use std::io;
+use std::iter::Filter;
 use std::fs;
 use std::path::Path;
 
@@ -47,7 +48,9 @@ impl<R: io::Read> Reader<R> {
 
     pub fn genes(&mut self) -> GffGenes<R> {
         GffGenes {
-            inner: self.records().group_by(GffGenes::<R>::gene_groupf),
+            inner: self.records()
+                .filter(GffGenes::<R>::gene_filter_func as GxFilterFunc)
+                .group_by(GffGenes::<R>::gene_group_func),
         }
     }
 
@@ -81,29 +84,40 @@ impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
 }
 
 pub struct GffGenes<'a, R: 'a> where R: io::Read, {
-    inner: GroupBy<GxGroupKey, GffRecords<'a, R>, GxGroupFunc>,
+    inner: GroupBy<GxGroupKey, GxRecords<'a, R>, GxGroupFunc>,
 }
+
+type GxFilterFunc = fn(&Result<gff::Record, Error>) -> bool;
+
+type GxRecords<'a, R> = Filter<GffRecords<'a, R>, GxFilterFunc>;
 
 type GxGroupKey = Option<(String, String, Strand)>;
 
 type GxGroupFunc = fn(&Result<gff::Record, Error>) -> GxGroupKey;
 
-type GxGroupedRecs<'a, 'b, R> = Group<'b, GxGroupKey, GffRecords<'a, R>, GxGroupFunc>;
+type GxGroupedRecs<'a, 'b, R> = Group<'b, GxGroupKey, GxRecords<'a, R>, GxGroupFunc>;
 
 type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
 
 impl<'a, R> GffGenes<'a, R> where R: io::Read {
 
-    fn gene_groupf(result: &Result<gff::Record, Error>) -> GxGroupKey {
+    fn gene_filter_func(result: &Result<gff::Record, Error>) -> bool {
+        match result {
+            &Ok(ref rec) => rec.attributes().contains_key(GENE_ID_STR),
+            &Err(_) => true,  // Err(_) is supposed to be handled elsewhere
+        }
+    }
+
+    fn gene_group_func(result: &Result<gff::Record, Error>) -> GxGroupKey {
         result.as_ref().ok()
             .map(|res| {
                 let gene_id = res.attributes().get(GENE_ID_STR)
-                    .map(|gid| gid.as_str())
-                    .unwrap_or("");
+                    .expect("'gene_id' attribute not found")
+                    .clone();
                 let seq_name = String::from(res.seqname());
                 let strand = res.strand().unwrap_or(Strand::Unknown);
 
-                (String::from(gene_id), seq_name, strand)
+                (gene_id, seq_name, strand)
             })
     }
 
