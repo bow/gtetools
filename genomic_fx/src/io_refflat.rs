@@ -277,7 +277,7 @@ impl<W: io::Write> Writer<W> {
     {
         let gene_id = match gid {
             Some(ref gid) => gid,
-            None => transcript.attributes.get("gene_id").map(|gid| gid.as_ref()).unwrap_or(""),
+            None => transcript.attributes().get("gene_id").map(|gid| gid.as_ref()).unwrap_or(""),
         };
         let transcript_name = transcript.id.as_ref()
             .map(|tn| tn.as_ref()).unwrap_or("");

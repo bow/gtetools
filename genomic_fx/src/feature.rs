@@ -30,6 +30,18 @@ macro_rules! impl_common {
                 self.strand = strand
             }
 
+            pub fn attributes(&self) -> &HashMap<String, String> {
+                &self.attributes
+            }
+
+            pub fn attributes_mut(&mut self) -> &mut HashMap<String, String> {
+                &mut self.attributes
+            }
+
+            pub fn set_attributes(&mut self, attributes: HashMap<String, String>) {
+                self.attributes = attributes
+            }
+
             pub fn interval(&self) -> &Interval<u64> {
                 &self.interval
             }
@@ -128,7 +140,7 @@ pub struct Exon {
     interval: Interval<u64>,
     strand: Strand,
     pub id: Option<String>,
-    pub attributes: HashMap<String, String>,
+    attributes: HashMap<String, String>,
     pub features: Vec<ExonFeature>,
 }
 
@@ -224,7 +236,7 @@ pub struct Transcript {
     interval: Interval<u64>,
     strand: Strand,
     pub id: Option<String>,
-    pub attributes: HashMap<String, String>,
+    attributes: HashMap<String, String>,
     exons: Vec<Exon>,
 }
 
@@ -454,7 +466,7 @@ pub struct Gene {
     interval: Interval<u64>,
     strand: Strand,
     pub id: Option<String>,
-    pub attributes: HashMap<String, String>,
+    attributes: HashMap<String, String>,
     transcripts: LinkedHashMap<String, Transcript>,
 }
 

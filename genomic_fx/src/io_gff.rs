@@ -316,15 +316,15 @@ impl Gene {
     // TODO: also handle gene-level features
     fn to_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
-        let (source, score) = extract_source_score(&mut self.attributes);
+        let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
         let gene_id = match self.id.take() {
             Some(gid) => {
-                self.attributes.insert(GENE_ID_STR.to_owned(), gid.clone());
+                self.attributes_mut().insert(GENE_ID_STR.to_owned(), gid.clone());
                 gid
             },
             None =>  {
-                self.attributes.get(GENE_ID_STR)
+                self.attributes().get(GENE_ID_STR)
                     .ok_or(Error::Gff("required 'gene_id' attribute not found"))
                     .map(|gid| gid.clone())?
             },
@@ -335,7 +335,7 @@ impl Gene {
         let row = GffRow(
             self.seq_name().to_owned(), source, GENE_STR.to_owned(),
             self.start(), self.end(), score, strand.to_owned(),
-            UNK_STR.to_owned(), self.attributes.clone());
+            UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(row));
 
         for (_, mut transcript) in self.into_transcripts() {
@@ -359,16 +359,16 @@ impl Transcript {
     // TODO: also handle transcript-level features
     fn to_gff_records(mut self, gene_id: &str) -> Result<Vec<gff::Record>, Error> {
 
-        self.attributes.insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
-        let (source, score) = extract_source_score(&mut self.attributes);
+        self.attributes_mut().insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
+        let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
         let transcript_id = match self.id.take() {
             Some(tid) => {
-                self.attributes.insert(TRANSCRIPT_ID_STR.to_owned(), tid.clone());
+                self.attributes_mut().insert(TRANSCRIPT_ID_STR.to_owned(), tid.clone());
                 tid
             },
             None =>  {
-                self.attributes.get(TRANSCRIPT_ID_STR)
+                self.attributes().get(TRANSCRIPT_ID_STR)
                     .ok_or(Error::Gff("required 'transcript_id' attribute not found"))
                     .map(|tid| tid.clone())?
             },
@@ -379,7 +379,7 @@ impl Transcript {
         let trx_row =
             GffRow(self.seq_name().to_owned(), source, TRANSCRIPT_STR.to_owned(),
                    self.start(), self.end(), score,
-                   strand.to_owned(), UNK_STR.to_owned(), self.attributes.clone());
+                   strand.to_owned(), UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(trx_row));
 
         for exon in self.into_exons() {
@@ -413,9 +413,9 @@ impl Exon {
     fn to_gff_records(mut self, gene_id: &str, transcript_id: &str
     ) -> Result<Vec<gff::Record>, Error> {
 
-        self.attributes.insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
-        self.attributes.insert(TRANSCRIPT_ID_STR.to_owned(), transcript_id.to_owned());
-        let (source, score) = extract_source_score(&mut self.attributes);
+        self.attributes_mut().insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
+        self.attributes_mut().insert(TRANSCRIPT_ID_STR.to_owned(), transcript_id.to_owned());
+        let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
 
         let mut recs = Vec::with_capacity(1 + self.features.len());
@@ -423,7 +423,7 @@ impl Exon {
         let exon_row =
             GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
                    self.start(), self.end(), score, strand.to_owned(),
-                   UNK_STR.to_owned(), self.attributes.clone());
+                   UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(exon_row));
 
         for fx in self.features.iter() {
@@ -431,7 +431,7 @@ impl Exon {
             let fx_row =
                 GffRow(self.seq_name().to_owned(), source.clone(), feature,
                        self.start(), self.end(), UNK_STR.to_owned(),
-                       strand.to_owned(), frame, self.attributes.clone());
+                       strand.to_owned(), frame, self.attributes().clone());
             recs.push(gff::Record::from(fx_row));
         }
 

@@ -53,9 +53,9 @@ fn tbuilder_basic() {
     assert_eq!(trx.seq_name(), "chrT");
     assert_eq!(trx.strand(), &Strand::Reverse);
     assert_eq!(trx.id, Some("transcript-1".to_owned()));
-    assert_eq!(trx.attributes.get("key1"), Some(&"value1".to_owned()));
-    assert_eq!(trx.attributes.get("key2"), Some(&"value2".to_owned()));
-    assert_eq!(trx.attributes.len(), 2);
+    assert_eq!(trx.attributes().get("key1"), Some(&"value1".to_owned()));
+    assert_eq!(trx.attributes().get("key2"), Some(&"value2".to_owned()));
+    assert_eq!(trx.attributes().len(), 2);
     assert_eq!(trx.exons().len(), 3);
 }
 
@@ -72,8 +72,8 @@ fn tbuilder_alt1() {
     assert_eq!(trx.seq_name(), "chrT");
     assert_eq!(trx.strand(), &Strand::Reverse);
     assert_eq!(trx.id, None);
-    assert_eq!(trx.attributes.get("tag"), Some(&"basic".to_owned()));
-    assert_eq!(trx.attributes.len(), 1);
+    assert_eq!(trx.attributes().get("tag"), Some(&"basic".to_owned()));
+    assert_eq!(trx.attributes().len(), 1);
     assert_eq!(trx.exons().len(), 3);
 }
 

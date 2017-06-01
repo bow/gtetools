@@ -33,8 +33,8 @@ fn gbuilder_basic() {
     assert_eq!(gx.seq_name(), "chrT");
     assert_eq!(gx.strand(), &Forward);
     assert_eq!(gx.id, Some("gene-1".to_owned()));
-    assert_eq!(gx.attributes.get("key1"), Some(&"value1".to_owned()));
-    assert_eq!(gx.attributes.get("key2"), Some(&"value2".to_owned()));
-    assert_eq!(gx.attributes.len(), 2);
+    assert_eq!(gx.attributes().get("key1"), Some(&"value1".to_owned()));
+    assert_eq!(gx.attributes().get("key2"), Some(&"value2".to_owned()));
+    assert_eq!(gx.attributes().len(), 2);
     assert_eq!(gx.transcripts().len(), 2);
 }
