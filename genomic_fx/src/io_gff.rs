@@ -334,7 +334,7 @@ impl Gene {
 
         let row = GffRow(
             self.seq_name().to_owned(), source, GENE_STR.to_owned(),
-            self.interval().start, self.interval().end, score, strand.to_owned(),
+            self.start(), self.end(), score, strand.to_owned(),
             UNK_STR.to_owned(), self.attributes.clone());
         recs.push(gff::Record::from(row));
 
@@ -378,7 +378,7 @@ impl Transcript {
 
         let trx_row =
             GffRow(self.seq_name().to_owned(), source, TRANSCRIPT_STR.to_owned(),
-                   self.interval().start, self.interval().end, score,
+                   self.start(), self.end(), score,
                    strand.to_owned(), UNK_STR.to_owned(), self.attributes.clone());
         recs.push(gff::Record::from(trx_row));
 
@@ -422,7 +422,7 @@ impl Exon {
 
         let exon_row =
             GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
-                   self.interval().start, self.interval().end, score, strand.to_owned(),
+                   self.start(), self.end(), score, strand.to_owned(),
                    UNK_STR.to_owned(), self.attributes.clone());
         recs.push(gff::Record::from(exon_row));
 
@@ -430,7 +430,7 @@ impl Exon {
             let (feature, frame) = fx.kind.get_feature_frame();
             let fx_row =
                 GffRow(self.seq_name().to_owned(), source.clone(), feature,
-                       self.interval().start, self.interval().end, UNK_STR.to_owned(),
+                       self.start(), self.end(), UNK_STR.to_owned(),
                        strand.to_owned(), UNK_STR.to_owned(), self.attributes.clone());
             recs.push(gff::Record::from(fx_row));
         }

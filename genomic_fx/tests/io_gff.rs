@@ -24,15 +24,15 @@ fn gtf_reader_single_gene() {
     let gx = next_gx(&mut genes);
     assert_eq!(gx.seq_name(), "chr2");
     assert_eq!(gx.id, Some("ENSG00000128645.13".to_owned()));
-    assert_eq!(gx.interval().start, 176188578);
-    assert_eq!(gx.interval().end, 176190907);
+    assert_eq!(gx.start(), 176188578);
+    assert_eq!(gx.end(), 176190907);
     assert_eq!(gx.strand(), &Forward);
     assert_eq!(gx.transcripts().len(), 2);
 
     let trx1 = gx.transcripts().get("ENST00000331462.5").expect("a transcript");
     assert_eq!(trx1.seq_name(), "chr2");
-    assert_eq!(trx1.interval().start, 176188578);
-    assert_eq!(trx1.interval().end, 176190907);
+    assert_eq!(trx1.start(), 176188578);
+    assert_eq!(trx1.end(), 176190907);
     assert_eq!(trx1.strand(), &Forward);
     assert_eq!(trx1.exons().len(), 2);
     let trx1_exon1 = [
@@ -56,8 +56,8 @@ fn gtf_reader_single_gene() {
 
     let trx2 = gx.transcripts().get("ENST00000610524.1").expect("a transcript");
     assert_eq!(trx2.seq_name(), "chr2");
-    assert_eq!(trx2.interval().start, 176188842);
-    assert_eq!(trx2.interval().end, 176188901);
+    assert_eq!(trx2.start(), 176188842);
+    assert_eq!(trx2.end(), 176188901);
     assert_eq!(trx2.strand(), &Forward);
     assert_eq!(trx2.exons().len(), 1);
     assert_eq!(trx2.exons()[0].features.len(), 0);
@@ -76,8 +76,8 @@ fn gtf_reader_multiple_transcripts() {
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.seq_name(), "chr2");
-    assert_eq!(trx1.interval().start, 176188578);
-    assert_eq!(trx1.interval().end, 176190907);
+    assert_eq!(trx1.start(), 176188578);
+    assert_eq!(trx1.end(), 176190907);
     assert_eq!(trx1.strand(), &Forward);
     assert_eq!(trx1.exons().len(), 2);
     let trx1_exon1 = [
@@ -101,8 +101,8 @@ fn gtf_reader_multiple_transcripts() {
 
     let trx2 = next_trx(&mut transcripts);
     assert_eq!(trx2.seq_name(), "chr2");
-    assert_eq!(trx2.interval().start, 176188842);
-    assert_eq!(trx2.interval().end, 176188901);
+    assert_eq!(trx2.start(), 176188842);
+    assert_eq!(trx2.end(), 176188901);
     assert_eq!(trx2.strand(), &Forward);
     assert_eq!(trx2.exons().len(), 1);
     assert_eq!(trx2.exons()[0].features.len(), 0);

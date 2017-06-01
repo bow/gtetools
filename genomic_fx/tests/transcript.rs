@@ -9,7 +9,7 @@ use Strand::*;
 
 fn exon_coords(transcript: &Transcript) -> Vec<(u64, u64)> {
     transcript.exons().iter()
-        .map(|exn| (exn.interval().start, exn.interval().end))
+        .map(|exn| (exn.start(), exn.end()))
         .collect()
 }
 

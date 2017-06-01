@@ -18,17 +18,25 @@ macro_rules! impl_common {
                 self.seq_name.as_str()
             }
 
-            pub fn interval(&self) -> &Interval<u64> {
-                &self.interval
-            }
-
             pub fn strand(&self) -> &Strand {
                 &self.strand
             }
 
+            pub fn interval(&self) -> &Interval<u64> {
+                &self.interval
+            }
+
+            pub fn start(&self) -> u64 {
+                self.interval.start
+            }
+
+            pub fn end(&self) -> u64 {
+                self.interval.end
+            }
+
             #[inline]
             pub fn span(&self) -> u64 {
-                self.interval().end - self.interval().start
+                self.end() - self.start()
             }
         }
 
@@ -1163,8 +1171,8 @@ where F: Fn(u64, u64, ExonFeatureKind) -> ExonFeature
         if codon_rem == 0 {
             break;
         };
-        let fx = feature_maker(max(exon.interval().start, exon.interval().end - codon_rem),
-                               exon.interval().end, efk.clone());
+        let fx = feature_maker(max(exon.start(), exon.end() - codon_rem),
+                               exon.end(), efk.clone());
         codon_rem -= fx.span();
         exon.features.push(fx);
     }

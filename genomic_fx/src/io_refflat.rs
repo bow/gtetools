@@ -204,8 +204,8 @@ impl<'a, R> RefFlatGenes<'a, R> where R: io::Read {
                 let (mut gene_start, mut gene_end) = (u64::max_value(), u64::min_value());
                 for record in records {
                     let transcript = record.and_then(|rec| rec.into_transcript())?;
-                    gene_start = min(gene_start, transcript.interval().start);
-                    gene_end = max(gene_end, transcript.interval().end);
+                    gene_start = min(gene_start, transcript.start());
+                    gene_end = max(gene_end, transcript.end());
                     let tid = transcript.id.clone()
                         .ok_or(Error::RefFlat("transcript does not have ID"))?;
                     transcripts.insert(tid, transcript);
@@ -288,12 +288,12 @@ impl<W: io::Write> Writer<W> {
         };
 
         let (coding_start, coding_end) = transcript.coding_coord(true)
-            .unwrap_or((transcript.interval().end, transcript.interval().end));
+            .unwrap_or((transcript.end(), transcript.end()));
         let (exon_starts, exon_ends) = Self::coords_field(&transcript);
 
         self.inner
             .encode((gene_id, transcript_name, transcript.seq_name(), strand_char,
-                     transcript.interval().start, transcript.interval().end,
+                     transcript.start(), transcript.end(),
                      coding_start, coding_end, transcript.exons().len(),
                      exon_starts, exon_ends))
             .map_err(Error::from)
@@ -301,9 +301,9 @@ impl<W: io::Write> Writer<W> {
 
     #[inline(always)]
     fn coords_field(trx: &Transcript) -> (String, String) {
-        let mut starts = trx.exons().iter().map(|exon| exon.interval().start).join(",");
+        let mut starts = trx.exons().iter().map(|exon| exon.start()).join(",");
         starts.push(',');
-        let mut ends = trx.exons().iter().map(|exon| exon.interval().end).join(",");
+        let mut ends = trx.exons().iter().map(|exon| exon.end()).join(",");
         ends.push(',');
         (starts, ends)
     }
