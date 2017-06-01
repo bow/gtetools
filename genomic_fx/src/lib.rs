@@ -25,7 +25,7 @@ pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
 
 mod io_gff;
 pub use io_gff::{Reader as GffReader,
-                 GffGenes};
+                 GffGenes, GffTranscripts};
 
 quick_error! {
     #[derive(Debug)]
