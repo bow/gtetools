@@ -114,10 +114,10 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
                 let gene_id = res.attributes().get(GENE_ID_STR)
                     .expect("'gene_id' attribute not found")
                     .clone();
-                let seq_name = String::from(res.seqname());
+                let seq_name = res.seqname().to_owned();
                 let strand = res.strand().unwrap_or(Strand::Unknown);
 
-                (gene_id, seq_name, strand)
+                (seq_name, gene_id, strand)
             })
     }
 
@@ -127,7 +127,7 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
 
             None => Err(records.filter_map(|x| x.err()).next().unwrap()),
 
-            Some((gid, seq_name, strand)) => {
+            Some((seq_name, gid, strand)) => {
 
                 let mut gene_coord = INIT_COORD;
                 let mut trx_coords: LinkedHashMap<String, RawTrxCoord> = LinkedHashMap::new();
