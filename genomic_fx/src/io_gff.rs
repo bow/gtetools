@@ -10,7 +10,8 @@ use bio::io::gff::{self, GffType};
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
-use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, Error};
+use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, TBuilder, Error,
+     RawTrxCoord};
 
 // Various commonly-used feature column values
 const GENE_STR: &'static str = "gene";
@@ -77,9 +78,7 @@ impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Result<gff::Record, Error>> {
         self.inner.next()
-            .map(|row| {
-                row.or_else(|err| Err(Error::from(err)))
-            })
+            .map(|row| row.map_err(Error::from))
     }
 }
 
@@ -96,8 +95,6 @@ type GxGroupKey = Option<(String, String, Strand)>;
 type GxGroupFunc = fn(&Result<gff::Record, Error>) -> GxGroupKey;
 
 type GxGroupedRecs<'a, 'b, R> = Group<'b, GxGroupKey, GxRecords<'a, R>, GxGroupFunc>;
-
-type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
 
 impl<'a, R> GffGenes<'a, R> where R: io::Read {
 
@@ -127,6 +124,7 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
 
             None => Err(records.filter_map(|x| x.err()).next().unwrap()),
 
+            // TODO: Create features of the parsed records instead of just capturing coordinates.
             Some((seq_name, gid, strand)) => {
 
                 let mut gene_coord = INIT_COORD;
@@ -159,7 +157,6 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
                             trx_entry.2 = (trx_entry.2).or(Some(INIT_COORD))
                                 .map(|coord| adjust_coord(coord, &rec));
                         },
-                        // TODO: How to best handle nested features? They may be out of order ...
                         _ => {},
                     }
                 }
@@ -168,6 +165,7 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
                     .id(gid)
                     .strand(strand)
                     .transcript_coords(trx_coords)
+                    .transcript_coding_incl_stop(false)
                     .build()
             },
         }
@@ -178,7 +176,7 @@ impl<'a, R> Iterator for GffGenes<'a, R> where R: io::Read {
 
     type Item = Result<Gene, Error>;
 
-    fn next(&mut self) -> Option<Result<Gene, Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_gene).next()
     }
 }
