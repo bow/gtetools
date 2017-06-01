@@ -18,8 +18,16 @@ macro_rules! impl_common {
                 self.seq_name.as_str()
             }
 
+            pub fn set_seq_name(&mut self, name: String) {
+                self.seq_name = name
+            }
+
             pub fn strand(&self) -> &Strand {
                 &self.strand
+            }
+
+            pub fn set_strand(&mut self, strand: Strand) {
+                self.strand = strand
             }
 
             pub fn interval(&self) -> &Interval<u64> {
