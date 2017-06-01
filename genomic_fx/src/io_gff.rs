@@ -431,7 +431,7 @@ impl Exon {
             let fx_row =
                 GffRow(self.seq_name().to_owned(), source.clone(), feature,
                        self.start(), self.end(), UNK_STR.to_owned(),
-                       strand.to_owned(), UNK_STR.to_owned(), self.attributes.clone());
+                       strand.to_owned(), frame, self.attributes.clone());
             recs.push(gff::Record::from(fx_row));
         }
 
