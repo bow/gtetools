@@ -132,9 +132,9 @@ pub struct EBuilder {
     end: u64,
     strand: Option<Strand>,
     strand_char: Option<char>,
-    pub id: Option<String>,
-    pub attributes: HashMap<String, String>,
-    pub features: Vec<ExonFeature>,
+    id: Option<String>,
+    attributes: HashMap<String, String>,
+    features: Vec<ExonFeature>,
 }
 
 impl EBuilder {
