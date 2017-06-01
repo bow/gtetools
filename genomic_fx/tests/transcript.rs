@@ -17,7 +17,7 @@ fn exon_fxs_coords(transcript: &Transcript) -> Vec<Vec<(u64, u64, ExonFeatureKin
     transcript.exons().iter()
         .map(|exn| {
             exn.features.iter()
-                .map(|fx| (fx.interval.start, fx.interval.end, fx.kind.clone()))
+                .map(|fx| (fx.start(), fx.end(), fx.kind().clone()))
                 .collect()
         })
         .collect()

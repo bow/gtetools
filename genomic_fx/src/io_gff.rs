@@ -427,7 +427,7 @@ impl Exon {
         recs.push(gff::Record::from(exon_row));
 
         for fx in self.features.iter() {
-            let (feature, frame) = fx.kind.get_feature_frame();
+            let (feature, frame) = fx.kind().get_feature_frame();
             let fx_row =
                 GffRow(self.seq_name().to_owned(), source.clone(), feature,
                        self.start(), self.end(), UNK_STR.to_owned(),

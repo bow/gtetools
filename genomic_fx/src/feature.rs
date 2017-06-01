@@ -45,15 +45,38 @@ macro_rules! impl_common {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Feature<K: FeatureKind> {
-    pub interval: Interval<u64>,
-    pub kind: K,
+    interval: Interval<u64>,
+    kind: K,
 }
 
 impl<K: FeatureKind> Feature<K> {
 
+    pub fn new(interval: Interval<u64>, kind: K) -> Self {
+        Feature {
+            interval: interval,
+            kind: kind,
+        }
+    }
+
+    pub fn kind(&self) -> &K {
+        &self.kind
+    }
+
+    pub fn interval(&self) -> &Interval<u64> {
+        &self.interval
+    }
+
+    pub fn start(&self) -> u64 {
+        self.interval.start
+    }
+
+    pub fn end(&self) -> u64 {
+        self.interval.end
+    }
+
     #[inline]
-    fn span(&self) -> u64 {
-        self.interval.end - self.interval.start
+    pub fn span(&self) -> u64 {
+        self.end() - self.start()
     }
 }
 

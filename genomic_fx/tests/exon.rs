@@ -12,10 +12,7 @@ use FeatureError::{InvalidInterval, InvalidStrandChar};
 use ExonFeatureKind::*;
 
 fn make_feat(start: u64, end: u64, kind: ExonFeatureKind) -> ExonFeature {
-    ExonFeature {
-        interval: Interval::new(start..end).unwrap(),
-        kind: kind,
-    }
+    ExonFeature::new(Interval::new(start..end).unwrap(), kind)
 }
 
 #[test]
