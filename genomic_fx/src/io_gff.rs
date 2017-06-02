@@ -337,7 +337,7 @@ impl Gene {
             UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(row));
 
-        for (_, transcript) in self.into_transcripts() {
+        for (_, transcript) in self.take_transcripts() {
             let mut trx_recs = transcript.into_gff_records(gene_id.as_str())?;
             recs.append(&mut trx_recs);
         }
@@ -382,7 +382,7 @@ impl Transcript {
                    strand.to_owned(), UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(trx_row));
 
-        for exon in self.into_exons() {
+        for exon in self.take_exons() {
             let mut exon_recs = exon.into_gff_records(gene_id, transcript_id.as_str())?;
             recs.append(&mut exon_recs);
         }

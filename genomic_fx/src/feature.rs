@@ -1,5 +1,6 @@
 use std::cmp::{max, min};
 use std::collections::HashMap;
+use std::mem;
 
 use bio::utils::{self, Interval, IntervalError};
 use bio::utils::Strand;
@@ -46,6 +47,10 @@ macro_rules! impl_common {
 
             pub fn set_attributes(&mut self, attributes: HashMap<String, String>) {
                 self.attributes = attributes
+            }
+
+            pub fn take_attributes(&mut self) -> HashMap<String, String> {
+                mem::replace(&mut self.attributes, HashMap::new())
             }
 
             pub fn interval(&self) -> &Interval<u64> {
@@ -199,6 +204,10 @@ impl Exon {
         self.features = features;
         Ok(())
     }
+
+    pub fn take_features(self) -> Vec<ExonFeature> {
+        self.features
+    }
 }
 
 pub struct EBuilder {
@@ -346,7 +355,7 @@ impl Transcript {
         self.exons.as_slice()
     }
 
-    pub fn into_exons(self) -> Vec<Exon> {
+    pub fn take_exons(self) -> Vec<Exon> {
         self.exons
     }
 
@@ -596,7 +605,7 @@ impl Gene {
         &self.transcripts
     }
 
-    pub fn into_transcripts(self) -> LinkedHashMap<String, Transcript> {
+    pub fn take_transcripts(self) -> LinkedHashMap<String, Transcript> {
         self.transcripts
     }
 }
