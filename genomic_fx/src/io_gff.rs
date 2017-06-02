@@ -383,8 +383,7 @@ impl Transcript {
         recs.push(gff::Record::from(trx_row));
 
         for exon in self.take_exons() {
-            let mut exon_recs = exon.into_gff_records(gene_id, transcript_id.as_str())?;
-            recs.append(&mut exon_recs);
+            recs.append(&mut exon.into_gff_records()?);
         }
 
         Ok(recs)
@@ -410,30 +409,37 @@ impl EFK {
 
 impl Exon {
 
-    pub fn into_gff_records(mut self, gene_id: &str, transcript_id: &str
-    ) -> Result<Vec<gff::Record>, Error> {
+    pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
-        self.attributes_mut().insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
-        self.attributes_mut().insert(TRANSCRIPT_ID_STR.to_owned(), transcript_id.to_owned());
-        let (source, score) = extract_source_score(self.attributes_mut());
+        let mut attribs = self.take_attributes();
+        let (source, score) = extract_source_score(&mut attribs);
+
+        self.gene_id()
+            .ok_or(Error::Gff("required 'gene_id' value not found"))
+            .map(|gid| attribs.insert(GENE_ID_STR.to_owned(), gid.to_owned()))?;
+
+        self.transcript_id()
+            .ok_or(Error::Gff("required 'transcript_id' value not found"))
+            .map(|tid| attribs.insert(TRANSCRIPT_ID_STR.to_owned(), tid.to_owned()))?;
+
         let strand = strand_to_string(self.strand());
 
         let mut recs = Vec::with_capacity(1 + self.features().len());
 
-        let exon_row =
-            GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
-                   self.start(), self.end(), score, strand.to_owned(),
-                   UNK_STR.to_owned(), self.attributes().clone());
-        recs.push(gff::Record::from(exon_row));
-
-        for fx in self.features() {
+        for (idx, fx) in self.features().iter().enumerate() {
             let (feature, frame) = fx.kind().get_feature_frame();
             let fx_row =
                 GffRow(self.seq_name().to_owned(), source.clone(), feature,
                        self.start(), self.end(), UNK_STR.to_owned(),
-                       strand.to_owned(), frame, self.attributes().clone());
-            recs.push(gff::Record::from(fx_row));
+                       strand.to_owned(), frame, attribs.clone());
+            recs[1 + idx] = gff::Record::from(fx_row);
         }
+
+        let exon_row =
+            GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
+                   self.start(), self.end(), score, strand.to_owned(),
+                   UNK_STR.to_owned(), attribs);
+        recs[0] = gff::Record::from(exon_row);
 
         Ok(recs)
     }
