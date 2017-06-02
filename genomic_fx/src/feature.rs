@@ -18,8 +18,10 @@ macro_rules! impl_common {
                 self.seq_name.as_str()
             }
 
-            pub fn set_seq_name(&mut self, name: String) {
-                self.seq_name = name
+            pub fn set_seq_name<T>(&mut self, name: T)
+                where T: Into<String>
+            {
+                self.seq_name = name.into()
             }
 
             pub fn id(&self) -> Option<&str> {
@@ -153,16 +155,20 @@ impl_common!(Exon);
 
 impl Exon {
 
-    pub fn set_id(&mut self, id: Option<String>) {
-        self.id = id
+    pub fn set_id<T>(&mut self, id: Option<T>)
+        where T: Into<String>
+    {
+        self.id = id.map(|v| v.into())
     }
 
     pub fn gene_id(&self) -> Option<&str> {
         self.gene_id.as_ref().map(|id| id.as_str())
     }
 
-    pub fn set_gene_id(&mut self, gene_id: Option<String>) {
-        self.gene_id = gene_id
+    pub fn set_gene_id<T>(&mut self, gene_id: Option<T>)
+        where T: Into<String>
+    {
+        self.gene_id = gene_id.map(|v| v.into())
     }
 
     pub fn features(&self) -> &[ExonFeature] {
@@ -293,19 +299,23 @@ impl_common!(Transcript);
 
 impl Transcript {
 
-    pub fn set_id(&mut self, id: Option<String>) {
-        self.id = id
+    pub fn set_id<T>(&mut self, id: Option<T>)
+        where T: Into<String>
+    {
+        self.id = id.map(|id| id.into())
     }
 
     pub fn gene_id(&self) -> Option<&str> {
         self.gene_id.as_ref().map(|id| id.as_str())
     }
 
-    pub fn set_gene_id(&mut self, gene_id: Option<String>) {
+    pub fn set_gene_id<T>(&mut self, gene_id: Option<T>)
+        where T: Into<String> + Clone
+    {
         for exon in self.exons.iter_mut() {
-            exon.gene_id = gene_id.clone();
+            exon.set_gene_id(gene_id.clone())
         }
-        self.gene_id = gene_id
+        self.gene_id = gene_id.map(|v| v.into())
     }
 
     pub fn exons(&self) -> &[Exon] {
@@ -548,11 +558,13 @@ impl_common!(Gene);
 
 impl Gene {
 
-    pub fn set_id(&mut self, id: Option<String>) {
+    pub fn set_id<T>(&mut self, id: Option<T>)
+        where T: Into<String> + Clone
+    {
         for (_, transcript) in self.transcripts.iter_mut() {
-            transcript.gene_id = id.clone();
+            transcript.set_id(id.clone())
         }
-        self.id = id
+        self.id = id.map(|v| v.into())
     }
 
     pub fn transcripts(&self) -> &LinkedHashMap<String, Transcript> {
