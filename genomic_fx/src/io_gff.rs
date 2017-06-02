@@ -314,27 +314,21 @@ impl Gene {
     // TODO: also handle gene-level features
     pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
-        let (source, score) = extract_source_score(self.attributes_mut());
+        let mut attribs = self.take_attributes();
+        let (source, score) = extract_source_score(&mut attribs);
+
+        self.id()
+            .ok_or(Error::Gff("required gene 'id' value not found"))
+            .map(|gid| attribs.insert(GENE_ID_STR.to_owned(), gid.to_owned()))?;
+
         let strand = strand_to_string(self.strand());
-        let ogene_id = self.id().map(|id| id.to_owned());
-        let gene_id = match ogene_id {
-            Some(gid) => {
-                self.attributes_mut().insert(GENE_ID_STR.to_owned(), gid.clone());
-                gid
-            },
-            None =>  {
-                self.attributes().get(GENE_ID_STR)
-                    .ok_or(Error::Gff("required 'gene_id' attribute not found"))
-                    .map(|gid| gid.clone())?
-            },
-        };
 
         let mut recs = Vec::with_capacity(self.num_records());
 
         let row = GffRow(
             self.seq_name().to_owned(), source, GENE_STR.to_owned(),
             self.start(), self.end(), score, strand.to_owned(),
-            UNK_STR.to_owned(), self.attributes().clone());
+            UNK_STR.to_owned(), attribs);
         recs.push(gff::Record::from(row));
 
         for (_, transcript) in self.take_transcripts() {
