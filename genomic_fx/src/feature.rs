@@ -552,7 +552,7 @@ impl TBuilder {
             .map_err(Error::Feature)?;
         let exons = resolve_exons_input(
             &self.seq_name, &interval, &strand, self.id.as_ref().map(|id| id.as_str()),
-            self.gene_id.as_ref().map(|id| id.as_str()),
+            self.gene_id.as_ref().map(|id| id.as_str()), None, // TODO: allow for exon IDs here
             self.exons, self.exon_coords.as_ref(), self.coding_coord,
             self.coding_incl_stop).map_err(Error::Feature)?;
 
@@ -782,6 +782,7 @@ fn resolve_exons_input(
     transcript_strand: &Strand,
     transcript_id: Option<&str>,
     gene_id: Option<&str>,
+    exon_id: Option<&str>,
     exons: Option<Vec<Exon>>,
     exon_coords: Option<&Vec<Coord<u64>>>,
     coding_coord: Option<Coord<u64>>,
@@ -803,7 +804,7 @@ fn resolve_exons_input(
         // exon defined & coords possibly defined (refFlat input)
         (None, Some(raw_exon_coords), raw_coding_coord) =>
             infer_exons(transcript_seqname, transcript_interval, transcript_strand, transcript_id,
-                        gene_id, raw_exon_coords, raw_coding_coord, coding_incl_stop),
+                        gene_id, exon_id, raw_exon_coords, raw_coding_coord, coding_incl_stop),
     }
 }
 
@@ -857,6 +858,7 @@ fn infer_exons(
     transcript_strand: &Strand,
     transcript_id: Option<&str>,
     gene_id: Option<&str>,
+    exon_id: Option<&str>,
     exon_coords: &Vec<Coord<u64>>,
     coding_coord: Option<Coord<u64>>,
     coding_incl_stop: bool
@@ -921,7 +923,8 @@ fn infer_exons(
             if !stop_codon_ok {
                 return Err(FeatureError::CodingTooLarge);
             }
-            infer_exon_features(&m_exon_coords, coding_r, &transcript_seqname, transcript_strand)
+            infer_exon_features(&m_exon_coords, coding_r, &transcript_seqname, transcript_strand,
+                                transcript_id, gene_id, exon_id)
         }
 
         // No CDS intervals mean we just sort the coordinates and create the exons
@@ -933,7 +936,7 @@ fn infer_exons(
                         seq_name: transcript_seqname.clone(),
                         interval: Interval::new(start..end).unwrap(),
                         strand: *transcript_strand,
-                        id: None,
+                        id: exon_id.map(|id| id.to_owned()),
                         transcript_id: transcript_id.map(|id| id.to_owned()),
                         gene_id: gene_id.map(|id| id.to_owned()),
                         attributes: HashMap::new(),
@@ -988,8 +991,11 @@ fn infer_exon_features(
     exon_coords: &Vec<Coord<u64>>,
     coding_r: Coord<u64>,
     transcript_seqname: &String,
-    transcript_strand: &Strand)
--> Result<Vec<Exon>, FeatureError> {
+    transcript_strand: &Strand,
+    transcript_id: Option<&str>,
+    gene_id: Option<&str>,
+    exon_id: Option<&str>,
+) -> Result<Vec<Exon>, FeatureError> {
 
     let mut exons: Vec<Exon> = Vec::with_capacity(exon_coords.len() * 2 + 4);
     let (utr1, utr2) = match transcript_strand {
@@ -1002,9 +1008,9 @@ fn infer_exon_features(
             seq_name: transcript_seqname.clone(),
             interval: Interval::new(start..end).unwrap(),
             strand: *transcript_strand,
-            id: None,
-            transcript_id: None,
-            gene_id: None,
+            id: exon_id.map(|v| v.to_owned()),
+            transcript_id: transcript_id.map(|v| v.to_owned()),
+            gene_id: gene_id.map(|v| v.to_owned()),
             attributes: HashMap::new(),
             features: features,
         }
