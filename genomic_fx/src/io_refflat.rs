@@ -20,7 +20,7 @@ use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
 use feature::FeatureError;
-use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, Error};
+use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, Error, INIT_COORD};
 
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
@@ -201,7 +201,7 @@ impl<'a, R> RefFlatGenes<'a, R> where R: io::Read {
 
             Some((gid, seq_name, strand_char)) => {
                 let mut transcripts = LinkedHashMap::new();
-                let (mut gene_start, mut gene_end) = (u64::max_value(), u64::min_value());
+                let (mut gene_start, mut gene_end) = INIT_COORD;
                 for record in records {
                     let transcript = record.and_then(|rec| rec.into_transcript())?;
                     gene_start = min(gene_start, transcript.start());
