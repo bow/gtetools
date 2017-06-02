@@ -46,7 +46,7 @@ fn refflat_reader_transcripts_single_row_no_cds() {
     let mut transcripts = reader.transcripts();
 
     let trx1 = next_trx(&mut transcripts);
-    assert_eq!(trx1.id, Some("NR_046018".to_owned()));
+    assert_eq!(trx1.id(), Some("NR_046018"));
 
     assert!(transcripts.next().is_none());
 }
@@ -57,7 +57,7 @@ fn refflat_reader_genes_single_row_no_cds() {
     let mut genes = reader.genes();
 
     let gx1 = next_gx(&mut genes);
-    assert_eq!(gx1.id, Some("DDX11L1".to_owned()));
+    assert_eq!(gx1.id(), Some("DDX11L1"));
 
     assert!(genes.next().is_none());
 }
@@ -82,10 +82,10 @@ fn refflat_reader_transcripts_mult_rows_no_cds() {
     let mut transcripts = reader.transcripts();
 
     let trx1 = next_trx(&mut transcripts);
-    assert_eq!(trx1.id, Some("NR_046018".to_owned()));
+    assert_eq!(trx1.id(), Some("NR_046018"));
 
     let trx2 = next_trx(&mut transcripts);
-    assert_eq!(trx2.id, Some("NR_030296".to_owned()));
+    assert_eq!(trx2.id(), Some("NR_030296"));
 
     assert!(transcripts.next().is_none());
 }
@@ -96,10 +96,10 @@ fn refflat_reader_genes_mult_rows_no_cds() {
     let mut genes = reader.genes();
 
     let gx1 = next_gx(&mut genes);
-    assert_eq!(gx1.id, Some("DDX11L1".to_owned()));
+    assert_eq!(gx1.id(), Some("DDX11L1"));
 
     let gx2 = next_gx(&mut genes);
-    assert_eq!(gx2.id, Some("MIR570".to_owned()));
+    assert_eq!(gx2.id(), Some("MIR570"));
 
     assert!(genes.next().is_none());
 }
@@ -128,14 +128,14 @@ fn refflat_reader_transcripts_mult_rows_mult_genes_with_cds() {
     let mut transcripts = reader.transcripts();
 
     let trx1 = next_trx(&mut transcripts);
-    assert_eq!(trx1.id, Some("NM_001297605".to_owned()));
+    assert_eq!(trx1.id(), Some("NM_001297605"));
 
     let _trx2 = next_trx(&mut transcripts);
     let _trx3 = next_trx(&mut transcripts);
     let _trx4 = next_trx(&mut transcripts);
 
     let trx5 = next_trx(&mut transcripts);
-    assert_eq!(trx5.id, Some("NM_138428".to_owned()));
+    assert_eq!(trx5.id(), Some("NM_138428"));
 
     assert!(transcripts.next().is_none());
 }
@@ -146,10 +146,10 @@ fn refflat_reader_genes_mult_rows_mult_genes_with_cds() {
     let mut genes = reader.genes();
 
     let gx1 = next_gx(&mut genes);
-    assert_eq!(gx1.id, Some("TNFRSF14".to_owned()));
+    assert_eq!(gx1.id(), Some("TNFRSF14"));
 
     let gx2 = next_gx(&mut genes);
-    assert_eq!(gx2.id, Some("SMIM12".to_owned()));
+    assert_eq!(gx2.id(), Some("SMIM12"));
 
     assert!(genes.next().is_none());
 }

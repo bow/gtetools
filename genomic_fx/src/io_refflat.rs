@@ -206,7 +206,7 @@ impl<'a, R> RefFlatGenes<'a, R> where R: io::Read {
                     let transcript = record.and_then(|rec| rec.into_transcript())?;
                     gene_start = min(gene_start, transcript.start());
                     gene_end = max(gene_end, transcript.end());
-                    let tid = transcript.id.clone()
+                    let tid = transcript.id().map(|id| id.to_owned())
                         .ok_or(Error::RefFlat("transcript does not have ID"))?;
                     transcripts.insert(tid, transcript);
                 }
@@ -265,7 +265,7 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
-        let gid = gene.id.as_ref().map(|v| v.as_ref());
+        let gid = gene.id().map(|v| v.as_ref());
         for (_, transcript) in gene.transcripts() {
             self.write_transcript_gid(&transcript, gid)?;
         }
@@ -279,7 +279,7 @@ impl<W: io::Write> Writer<W> {
             Some(ref gid) => gid,
             None => transcript.attributes().get("gene_id").map(|gid| gid.as_ref()).unwrap_or(""),
         };
-        let transcript_name = transcript.id.as_ref()
+        let transcript_name = transcript.id()
             .map(|tn| tn.as_ref()).unwrap_or("");
         let strand_char = match transcript.strand() {
             &Strand::Forward => '+',

@@ -315,7 +315,8 @@ impl Gene {
 
         let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
-        let gene_id = match self.id.take() {
+        let ogene_id = self.id().map(|id| id.to_owned());
+        let gene_id = match ogene_id {
             Some(gid) => {
                 self.attributes_mut().insert(GENE_ID_STR.to_owned(), gid.clone());
                 gid
@@ -359,7 +360,8 @@ impl Transcript {
         self.attributes_mut().insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
         let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
-        let transcript_id = match self.id.take() {
+        let otranscript_id = self.id().map(|id| id.to_owned());
+        let transcript_id = match otranscript_id {
             Some(tid) => {
                 self.attributes_mut().insert(TRANSCRIPT_ID_STR.to_owned(), tid.clone());
                 tid

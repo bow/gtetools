@@ -30,7 +30,7 @@ fn ebuilder_basic() {
     let exon = exonb.unwrap();
     assert_eq!(exon.seq_name(), "chrT");
     assert_eq!(exon.strand(), &Strand::Forward);
-    assert_eq!(exon.id, Some("ex1.1".to_owned()));
+    assert_eq!(exon.id(), Some("ex1.1"));
     assert_eq!(exon.attributes().get("key1"), Some(&"value1".to_owned()));
     assert_eq!(exon.attributes().get("key2"), Some(&"value2".to_owned()));
     assert_eq!(exon.attributes().len(), 2);
@@ -48,7 +48,7 @@ fn ebuilder_alt1() {
     let exon = exonb.unwrap();
     assert_eq!(exon.seq_name(), "chrO");
     assert_eq!(exon.strand(), &Strand::Reverse);
-    assert_eq!(exon.id, None);
+    assert_eq!(exon.id(), None);
     assert_eq!(exon.attributes().get("name"), Some(&"ex1".to_owned()));
     assert_eq!(exon.attributes().len(), 1);
     assert_eq!(exon.features().len(), 0);

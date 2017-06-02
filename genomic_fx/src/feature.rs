@@ -22,6 +22,14 @@ macro_rules! impl_common {
                 self.seq_name = name
             }
 
+            pub fn id(&self) -> Option<&str> {
+                self.id.as_ref().map(|id| id.as_str())
+            }
+
+            pub fn set_id(&mut self, id: Option<String>) {
+                self.id = id
+            }
+
             pub fn strand(&self) -> &Strand {
                 &self.strand
             }
@@ -139,7 +147,7 @@ pub struct Exon {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
-    pub id: Option<String>,
+    id: Option<String>,
     attributes: HashMap<String, String>,
     features: Vec<ExonFeature>,
 }
@@ -256,7 +264,7 @@ pub struct Transcript {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
-    pub id: Option<String>,
+    id: Option<String>,
     attributes: HashMap<String, String>,
     exons: Vec<Exon>,
 }
@@ -486,7 +494,7 @@ pub struct Gene {
     seq_name: String,
     interval: Interval<u64>,
     strand: Strand,
-    pub id: Option<String>,
+    id: Option<String>,
     attributes: HashMap<String, String>,
     transcripts: LinkedHashMap<String, Transcript>,
 }

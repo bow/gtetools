@@ -23,7 +23,7 @@ fn gtf_reader_single_gene() {
 
     let gx = next_gx(&mut genes);
     assert_eq!(gx.seq_name(), "chr2");
-    assert_eq!(gx.id, Some("ENSG00000128645.13".to_owned()));
+    assert_eq!(gx.id(), Some("ENSG00000128645.13"));
     assert_eq!(gx.start(), 176188578);
     assert_eq!(gx.end(), 176190907);
     assert_eq!(gx.strand(), &Forward);
