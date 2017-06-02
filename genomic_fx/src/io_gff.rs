@@ -258,7 +258,7 @@ impl<'a, R> GffTranscripts<'a, R> where R: io::Read {
                             exn_coords.push((*rec.start() - 1, *rec.end()));
                         },
                         CDS_STR => {
-                            (coding_coord).or(Some(INIT_COORD))
+                            coding_coord = (coding_coord).or(Some(INIT_COORD))
                                 .map(|coord| adjust_coord(coord, &rec));
                         },
                         _ => {},
