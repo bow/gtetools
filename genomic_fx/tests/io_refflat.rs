@@ -192,7 +192,7 @@ fn refflat_writer_transcripts_single_row_no_cds() {
     let trx = TBuilder::new("chr1", 11873,  14409)
         .strand_char('+')
         .id("NR_046018")
-        .attribute("gene_id", "DDX11L1")
+        .gene_id("DDX11L1")
         .coords(vec![(11873, 12227), (12612, 12721), (13220, 14409)], None)
         .coding_incl_stop(true)
         .build()
@@ -311,7 +311,7 @@ fn refflat_writer_transcripts_mult_rows_mult_genes_with_cds() {
                 (2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
                 (2560623, 2560714), (2562864, 2562896), (2563147, 2565622)],
                 Some((2556664, 2562868)))
-            .attribute("gene_id", "TNFRSF14").id("NM_001297605")
+            .gene_id("TNFRSF14").id("NM_001297605")
             .coding_incl_stop(true)
             .build().expect("a transcript"),
         TBuilder::new("chr1", 2556364, 2565622)
@@ -320,7 +320,7 @@ fn refflat_writer_transcripts_mult_rows_mult_genes_with_cds() {
                 (2556364, 2556733), (2557725, 2557834), (2558342, 2558468), (2559822, 2559978),
                 (2560623, 2560714), (2561672, 2561815), (2562864, 2562896),
                 (2563147, 2565622)], Some((2556664, 2563273)))
-            .attribute("gene_id", "TNFRSF14").id("NM_003820")
+            .gene_id("TNFRSF14").id("NM_003820")
             .coding_incl_stop(true)
             .build().expect("a transcript"),
         TBuilder::new("chr1", 34850361, 34859045)
@@ -328,21 +328,21 @@ fn refflat_writer_transcripts_mult_rows_mult_genes_with_cds() {
             .coords(vec![
                 (34850361, 34855982), (34856555, 34856739), (34858839, 34859045)],
                 Some((34855698, 34855977)))
-            .attribute("gene_id", "SMIM12").id("NM_001164824")
+            .gene_id("SMIM12").id("NM_001164824")
             .coding_incl_stop(true)
             .build().expect("a transcript"),
         TBuilder::new("chr1", 34850361, 34859737)
             .strand(Strand::Reverse)
             .coords(vec![
                 (34850361, 34855982), (34859454, 34859737)], Some((34855698, 34855977)))
-            .attribute("gene_id", "SMIM12").id("NM_001164825")
+            .gene_id("SMIM12").id("NM_001164825")
             .coding_incl_stop(true)
             .build().expect("a transcript"),
         TBuilder::new("chr1", 34850361, 34859816)
             .strand(Strand::Reverse)
             .coords(vec![
                 (34850361, 34855982), (34859676, 34859816)], Some((34855698, 34855977)))
-            .attribute("gene_id", "SMIM12").id("NM_138428")
+            .gene_id("SMIM12").id("NM_138428")
             .coding_incl_stop(true)
             .build().expect("a transcript"),
     ];

@@ -62,10 +62,10 @@ impl RefFlatRecord {
 
         TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
             .id(self.transcript_name)
+            .gene_id(self.gene_id)
             .strand(strand)
             .coords(exon_coords, coding_coord)
             .coding_incl_stop(true)
-            .attribute("gene_id", self.gene_id)
             .build()
             .map_err(Error::from)
     }
@@ -261,24 +261,6 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write_transcript(&mut self, transcript: &Transcript) -> Result<(), Error> {
-        self.write_transcript_gid(&transcript, None)
-    }
-
-    pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
-        let gid = gene.id().map(|v| v.as_ref());
-        for (_, transcript) in gene.transcripts() {
-            self.write_transcript_gid(&transcript, gid)?;
-        }
-        Ok(())
-    }
-
-    fn write_transcript_gid(&mut self, transcript: &Transcript, gid: Option<&str>)
-    -> Result<(), Error>
-    {
-        let gene_id = match gid {
-            Some(ref gid) => gid,
-            None => transcript.attributes().get("gene_id").map(|gid| gid.as_ref()).unwrap_or(""),
-        };
         let transcript_name = transcript.id()
             .map(|tn| tn.as_ref()).unwrap_or("");
         let strand_char = match transcript.strand() {
@@ -292,11 +274,18 @@ impl<W: io::Write> Writer<W> {
         let (exon_starts, exon_ends) = Self::coords_field(&transcript);
 
         self.inner
-            .encode((gene_id, transcript_name, transcript.seq_name(), strand_char,
+            .encode((transcript.gene_id(), transcript_name, transcript.seq_name(), strand_char,
                      transcript.start(), transcript.end(),
                      coding_start, coding_end, transcript.exons().len(),
                      exon_starts, exon_ends))
             .map_err(Error::from)
+    }
+
+    pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
+        for transcript in gene.transcripts().values() {
+            self.write_transcript(&transcript)?;
+        }
+        Ok(())
     }
 
     #[inline(always)]

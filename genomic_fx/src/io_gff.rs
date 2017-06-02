@@ -264,6 +264,7 @@ impl<'a, R> GffTranscripts<'a, R> where R: io::Read {
 
                 TBuilder::new(seq_name, trx_coord.0, trx_coord.1)
                     .id(tid)
+                    .gene_id(gid.clone())
                     .strand(strand)
                     .coords(exn_coords, coding_coord)
                     .coding_incl_stop(false)
