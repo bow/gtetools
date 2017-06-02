@@ -11,7 +11,7 @@ use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, TBuilder, Error,
-     RawTrxCoord};
+     RawTrxCoord, INIT_COORD};
 
 // Various commonly-used feature column values
 const GENE_STR: &'static str = "gene";
@@ -30,9 +30,6 @@ const UNK_STR: &'static str = ".";
 // Commonly-used attribute keys.
 const GENE_ID_STR: &'static str = "gene_id";
 const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
-
-// Initial coordinate for features.
-const INIT_COORD: (u64, u64) = (::std::u64::MAX, ::std::u64::MIN);
 
 
 pub struct Reader<R: io::Read> {
@@ -352,7 +349,7 @@ impl Transcript {
     #[inline(always)]
     fn num_records(&self) -> usize {
         1 + self.exons().iter()
-            .map(|ref exn| 1 + exn.features.len())
+            .map(|ref exn| 1 + exn.features().len())
             .fold(0, |acc, x| acc + x)
     }
 
@@ -418,7 +415,7 @@ impl Exon {
         let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
 
-        let mut recs = Vec::with_capacity(1 + self.features.len());
+        let mut recs = Vec::with_capacity(1 + self.features().len());
 
         let exon_row =
             GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
@@ -426,7 +423,7 @@ impl Exon {
                    UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(exon_row));
 
-        for fx in self.features.iter() {
+        for fx in self.features() {
             let (feature, frame) = fx.kind().get_feature_frame();
             let fx_row =
                 GffRow(self.seq_name().to_owned(), source.clone(), feature,

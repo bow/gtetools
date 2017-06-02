@@ -5,7 +5,7 @@ use bio::utils::{self, Interval, IntervalError};
 use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 
-use {Coord, Error, RawTrxCoord};
+use {Coord, Error, RawTrxCoord, INIT_COORD};
 use self::ExonFeatureKind::*;
 
 
@@ -141,10 +141,31 @@ pub struct Exon {
     strand: Strand,
     pub id: Option<String>,
     attributes: HashMap<String, String>,
-    pub features: Vec<ExonFeature>,
+    features: Vec<ExonFeature>,
 }
 
 impl_common!(Exon);
+
+impl Exon {
+
+    pub fn features(&self) -> &[ExonFeature] {
+        self.features.as_slice()
+    }
+
+    pub fn features_mut(&mut self) -> &mut [ExonFeature] {
+        self.features.as_mut_slice()
+    }
+
+    pub fn set_features(&mut self, features: Vec<ExonFeature>) -> Result<(), FeatureError> {
+        let (new_start, new_end) = features.iter()
+            .fold(INIT_COORD,
+                  |acc, x| (min(acc.0, x.start()),
+                            max(acc.1, x.end())));
+        self.interval = coord_to_interval(new_start, new_end)?;
+        self.features = features;
+        Ok(())
+    }
+}
 
 pub struct EBuilder {
     seq_name: String,
@@ -633,6 +654,7 @@ quick_error! {
     }
 }
 
+#[inline(always)]
 fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
     Interval::new(start..end).map_err(FeatureError::from)
 }

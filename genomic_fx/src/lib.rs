@@ -64,3 +64,6 @@ type Coord<T> = (T, T);
 
 // Helper type alias for raw transcript coordinate inputs
 type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
+
+// Initial coordinate for features.
+const INIT_COORD: (u64, u64) = (::std::u64::MAX, ::std::u64::MIN);

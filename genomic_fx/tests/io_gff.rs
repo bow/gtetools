@@ -39,7 +39,7 @@ fn gtf_reader_single_gene() {
         ((176188578, 176188801), EFK::UTR5),
         ((176188801, 176188804), EFK::StartCodon { frame: Some(0) }),
         ((176188801, 176189453), EFK::CDS { frame: Some(0) })];
-    for (eidx, feat) in trx1.exons()[0].features.iter().enumerate() {
+    for (eidx, feat) in trx1.exons()[0].features().iter().enumerate() {
         assert_eq!(feat.start(), (trx1_exon1[eidx].0).0);
         assert_eq!(feat.end(), (trx1_exon1[eidx].0).1);
         assert_eq!(feat.kind(), &trx1_exon1[eidx].1)
@@ -48,7 +48,7 @@ fn gtf_reader_single_gene() {
         ((176189807, 176190139), EFK::CDS { frame: Some(2) }),
         ((176190139, 176190142), EFK::StopCodon { frame: Some(0) }),
         ((176190139, 176190907), EFK::UTR3)];
-    for (eidx, feat) in trx1.exons()[1].features.iter().enumerate() {
+    for (eidx, feat) in trx1.exons()[1].features().iter().enumerate() {
         assert_eq!(feat.start(), (trx1_exon2[eidx].0).0);
         assert_eq!(feat.end(), (trx1_exon2[eidx].0).1);
         assert_eq!(feat.kind(), &trx1_exon2[eidx].1)
@@ -60,7 +60,7 @@ fn gtf_reader_single_gene() {
     assert_eq!(trx2.end(), 176188901);
     assert_eq!(trx2.strand(), &Forward);
     assert_eq!(trx2.exons().len(), 1);
-    assert_eq!(trx2.exons()[0].features.len(), 0);
+    assert_eq!(trx2.exons()[0].features().len(), 0);
 
     assert!(genes.next().is_none());
 }
@@ -84,7 +84,7 @@ fn gtf_reader_multiple_transcripts() {
         ((176188578, 176188801), EFK::UTR5),
         ((176188801, 176188804), EFK::StartCodon { frame: Some(0) }),
         ((176188801, 176189453), EFK::CDS { frame: Some(0) })];
-    for (eidx, feat) in trx1.exons()[0].features.iter().enumerate() {
+    for (eidx, feat) in trx1.exons()[0].features().iter().enumerate() {
         assert_eq!(feat.start(), (trx1_exon1[eidx].0).0);
         assert_eq!(feat.end(), (trx1_exon1[eidx].0).1);
         assert_eq!(feat.kind(), &trx1_exon1[eidx].1)
@@ -93,7 +93,7 @@ fn gtf_reader_multiple_transcripts() {
         ((176189807, 176190139), EFK::CDS { frame: Some(2) }),
         ((176190139, 176190142), EFK::StopCodon { frame: Some(0) }),
         ((176190139, 176190907), EFK::UTR3)];
-    for (eidx, feat) in trx1.exons()[1].features.iter().enumerate() {
+    for (eidx, feat) in trx1.exons()[1].features().iter().enumerate() {
         assert_eq!(feat.start(), (trx1_exon2[eidx].0).0);
         assert_eq!(feat.end(), (trx1_exon2[eidx].0).1);
         assert_eq!(feat.kind(), &trx1_exon2[eidx].1)
@@ -105,7 +105,7 @@ fn gtf_reader_multiple_transcripts() {
     assert_eq!(trx2.end(), 176188901);
     assert_eq!(trx2.strand(), &Forward);
     assert_eq!(trx2.exons().len(), 1);
-    assert_eq!(trx2.exons()[0].features.len(), 0);
+    assert_eq!(trx2.exons()[0].features().len(), 0);
 
     assert!(transcripts.next().is_none());
 }

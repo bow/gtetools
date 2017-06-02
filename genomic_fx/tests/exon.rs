@@ -34,7 +34,7 @@ fn ebuilder_basic() {
     assert_eq!(exon.attributes().get("key1"), Some(&"value1".to_owned()));
     assert_eq!(exon.attributes().get("key2"), Some(&"value2".to_owned()));
     assert_eq!(exon.attributes().len(), 2);
-    assert_eq!(exon.features, vec![make_feat(10, 15, UTR5)]);
+    assert_eq!(exon.features().to_vec(), vec![make_feat(10, 15, UTR5)]);
 }
 
 #[test]
@@ -51,7 +51,7 @@ fn ebuilder_alt1() {
     assert_eq!(exon.id, None);
     assert_eq!(exon.attributes().get("name"), Some(&"ex1".to_owned()));
     assert_eq!(exon.attributes().len(), 1);
-    assert_eq!(exon.features, vec![]);
+    assert_eq!(exon.features().len(), 0);
 }
 
 #[test]
