@@ -26,10 +26,6 @@ macro_rules! impl_common {
                 self.id.as_ref().map(|id| id.as_str())
             }
 
-            pub fn set_id(&mut self, id: Option<String>) {
-                self.id = id
-            }
-
             pub fn strand(&self) -> &Strand {
                 &self.strand
             }
@@ -157,6 +153,10 @@ impl_common!(Exon);
 
 impl Exon {
 
+    pub fn set_id(&mut self, id: Option<String>) {
+        self.id = id
+    }
+
     pub fn gene_id(&self) -> Option<&str> {
         self.gene_id.as_ref().map(|id| id.as_str())
     }
@@ -231,10 +231,10 @@ impl EBuilder {
         self
     }
 
-    pub fn gene_id<T>(mut self, id: T) -> Self
+    pub fn gene_id<T>(mut self, gene_id: T) -> Self
         where T: Into<String>
     {
-        self.id = Some(id.into());
+        self.gene_id = Some(gene_id.into());
         self
     }
 
@@ -293,11 +293,18 @@ impl_common!(Transcript);
 
 impl Transcript {
 
+    pub fn set_id(&mut self, id: Option<String>) {
+        self.id = id
+    }
+
     pub fn gene_id(&self) -> Option<&str> {
         self.gene_id.as_ref().map(|id| id.as_str())
     }
 
     pub fn set_gene_id(&mut self, gene_id: Option<String>) {
+        for exon in self.exons.iter_mut() {
+            exon.gene_id = gene_id.clone();
+        }
         self.gene_id = gene_id
     }
 
@@ -462,10 +469,10 @@ impl TBuilder {
         self
     }
 
-    pub fn gene_id<T>(mut self, id: T) -> Self
+    pub fn gene_id<T>(mut self, gene_id: T) -> Self
         where T: Into<String>
     {
-        self.gene_id = Some(id.into());
+        self.gene_id = Some(gene_id.into());
         self
     }
 
@@ -540,6 +547,13 @@ pub struct Gene {
 impl_common!(Gene);
 
 impl Gene {
+
+    pub fn set_id(&mut self, id: Option<String>) {
+        for (_, transcript) in self.transcripts.iter_mut() {
+            transcript.gene_id = id.clone();
+        }
+        self.id = id
+    }
 
     pub fn transcripts(&self) -> &LinkedHashMap<String, Transcript> {
         &self.transcripts
