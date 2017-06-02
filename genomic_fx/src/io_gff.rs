@@ -314,7 +314,7 @@ impl Gene {
     }
 
     // TODO: also handle gene-level features
-    fn to_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
+    pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
         let (source, score) = extract_source_score(self.attributes_mut());
         let strand = strand_to_string(self.strand());
@@ -338,8 +338,8 @@ impl Gene {
             UNK_STR.to_owned(), self.attributes().clone());
         recs.push(gff::Record::from(row));
 
-        for (_, mut transcript) in self.into_transcripts() {
-            let mut trx_recs = transcript.to_gff_records(gene_id.as_str())?;
+        for (_, transcript) in self.into_transcripts() {
+            let mut trx_recs = transcript.into_gff_records(gene_id.as_str())?;
             recs.append(&mut trx_recs);
         }
 
@@ -357,7 +357,7 @@ impl Transcript {
     }
 
     // TODO: also handle transcript-level features
-    fn to_gff_records(mut self, gene_id: &str) -> Result<Vec<gff::Record>, Error> {
+    pub fn into_gff_records(mut self, gene_id: &str) -> Result<Vec<gff::Record>, Error> {
 
         self.attributes_mut().insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
         let (source, score) = extract_source_score(self.attributes_mut());
@@ -383,7 +383,7 @@ impl Transcript {
         recs.push(gff::Record::from(trx_row));
 
         for exon in self.into_exons() {
-            let mut exon_recs = exon.to_gff_records(gene_id, transcript_id.as_str())?;
+            let mut exon_recs = exon.into_gff_records(gene_id, transcript_id.as_str())?;
             recs.append(&mut exon_recs);
         }
 
@@ -410,7 +410,7 @@ impl EFK {
 
 impl Exon {
 
-    fn to_gff_records(mut self, gene_id: &str, transcript_id: &str
+    pub fn into_gff_records(mut self, gene_id: &str, transcript_id: &str
     ) -> Result<Vec<gff::Record>, Error> {
 
         self.attributes_mut().insert(GENE_ID_STR.to_owned(), gene_id.to_owned());
@@ -436,26 +436,6 @@ impl Exon {
         }
 
         Ok(recs)
-    }
-}
-
-pub struct Writer<W: io::Write> {
-    inner: gff::Writer<W>,
-}
-
-impl<W: io::Write> Writer<W> {
-
-    pub fn from_writer(in_writer: W, gff_type: GffType) -> Writer<W> {
-        Writer {
-            inner: gff::Writer::new(in_writer, gff_type),
-        }
-    }
-
-    pub fn write_gene(&mut self, mut gene: Gene) -> Result<(), Error> {
-        for record in gene.to_gff_records()?.iter() {
-            self.inner.write(&record)?;
-        }
-        Ok(())
     }
 }
 
