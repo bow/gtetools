@@ -147,6 +147,7 @@ pub struct Exon {
     strand: Strand,
     id: Option<String>,
     gene_id: Option<String>,
+    transcript_id: Option<String>,
     attributes: HashMap<String, String>,
     features: Vec<ExonFeature>,
 }
@@ -159,6 +160,16 @@ impl Exon {
         where T: Into<String>
     {
         self.id = id.map(|v| v.into())
+    }
+
+    pub fn transcript_id(&self) -> Option<&str> {
+        self.transcript_id.as_ref().map(|id| id.as_str())
+    }
+
+    pub fn set_transcript_id<T>(&mut self, transcript_id: Option<T>)
+        where T: Into<String>
+    {
+        self.transcript_id = transcript_id.map(|v| v.into())
     }
 
     pub fn gene_id(&self) -> Option<&str> {
@@ -197,6 +208,7 @@ pub struct EBuilder {
     strand: Option<Strand>,
     strand_char: Option<char>,
     id: Option<String>,
+    transcript_id: Option<String>,
     gene_id: Option<String>,
     attributes: HashMap<String, String>,
     features: Vec<ExonFeature>,
@@ -214,6 +226,7 @@ impl EBuilder {
             strand: None,
             strand_char: None,
             id: None,
+            transcript_id: None,
             gene_id: None,
             attributes: HashMap::new(),
             features: Vec::new(),
@@ -234,6 +247,13 @@ impl EBuilder {
         where T: Into<String>
     {
         self.id = Some(id.into());
+        self
+    }
+
+    pub fn transcript_id<T>(mut self, transcript_id: T) -> Self
+        where T: Into<String>
+    {
+        self.transcript_id = Some(transcript_id.into());
         self
     }
 
@@ -276,6 +296,7 @@ impl EBuilder {
             interval: interval,
             strand: strand,
             id: self.id,
+            transcript_id: self.transcript_id,
             gene_id: self.gene_id,
             attributes: self.attributes,
             features: self.features,
@@ -300,8 +321,11 @@ impl_common!(Transcript);
 impl Transcript {
 
     pub fn set_id<T>(&mut self, id: Option<T>)
-        where T: Into<String>
+        where T: Into<String> + Clone
     {
+        for exon in self.exons.iter_mut() {
+            exon.set_transcript_id(id.clone())
+        }
         self.id = id.map(|id| id.into())
     }
 
@@ -527,7 +551,8 @@ impl TBuilder {
         let strand = resolve_strand_input(self.strand, self.strand_char)
             .map_err(Error::Feature)?;
         let exons = resolve_exons_input(
-            &self.seq_name, &interval, &strand, self.gene_id.as_ref().map(|id| id.as_str()),
+            &self.seq_name, &interval, &strand, self.id.as_ref().map(|id| id.as_str()),
+            self.gene_id.as_ref().map(|id| id.as_str()),
             self.exons, self.exon_coords.as_ref(), self.coding_coord,
             self.coding_incl_stop).map_err(Error::Feature)?;
 
@@ -755,6 +780,7 @@ fn resolve_exons_input(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
+    transcript_id: Option<&str>,
     gene_id: Option<&str>,
     exons: Option<Vec<Exon>>,
     exon_coords: Option<&Vec<Coord<u64>>>,
@@ -776,7 +802,7 @@ fn resolve_exons_input(
 
         // exon defined & coords possibly defined (refFlat input)
         (None, Some(raw_exon_coords), raw_coding_coord) =>
-            infer_exons(transcript_seqname, transcript_interval, transcript_strand,
+            infer_exons(transcript_seqname, transcript_interval, transcript_strand, transcript_id,
                         gene_id, raw_exon_coords, raw_coding_coord, coding_incl_stop),
     }
 }
@@ -829,6 +855,7 @@ fn infer_exons(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
     transcript_strand: &Strand,
+    transcript_id: Option<&str>,
     gene_id: Option<&str>,
     exon_coords: &Vec<Coord<u64>>,
     coding_coord: Option<Coord<u64>>,
@@ -907,6 +934,7 @@ fn infer_exons(
                         interval: Interval::new(start..end).unwrap(),
                         strand: *transcript_strand,
                         id: None,
+                        transcript_id: transcript_id.map(|id| id.to_owned()),
                         gene_id: gene_id.map(|id| id.to_owned()),
                         attributes: HashMap::new(),
                         features: Vec::new(),
@@ -975,6 +1003,7 @@ fn infer_exon_features(
             interval: Interval::new(start..end).unwrap(),
             strand: *transcript_strand,
             id: None,
+            transcript_id: None,
             gene_id: None,
             attributes: HashMap::new(),
             features: features,
