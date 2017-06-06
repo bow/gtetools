@@ -245,6 +245,7 @@ impl<'a, R> GffTranscripts<'a, R> where R: io::Read {
                 for record in records {
 
                     let mut rec = record?;
+                    rec.attributes_mut().remove(GENE_ID_STR);
                     rec.attributes_mut().remove(TRANSCRIPT_ID_STR);
 
                     match rec.feature_type() {
