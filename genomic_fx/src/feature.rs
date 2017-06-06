@@ -1037,13 +1037,21 @@ fn infer_exon_features(
 
         if start < coding_r.0 {
 
+            let mut exon = exn(start, end, vec![]);
+            let utr_end =
+                if let &Strand::Reverse = transcript_strand {
+                    min(end, coding_r.0 - codon1_rem)
+                } else {
+                    min(end, coding_r.0)
+                };
+            if start < utr_end {
+                exon.features.push(feat(start, utr_end, utr1.clone()));
+            }
+
             if end < coding_r.0 {
-                let exon = exn(start, end, vec![feat(start, end, utr1.clone())]);
                 exons.push(exon);
 
             } else if end == coding_r.0 {
-                let mut exon = exn(start, end, vec![feat(start, end, utr1.clone())]);
-
                 if let &Strand::Reverse = transcript_strand {
                     let fx = feat(max(start, coding_r.0 - codon1_rem), coding_r.0,
                                   StopCodon { frame: None });
@@ -1055,7 +1063,6 @@ fn infer_exon_features(
                 exons.push(exon);
 
             } else if end > coding_r.0 && end < coding_r.1 {
-                let mut exon = exn(start, end, vec![feat(start, coding_r.0, utr1.clone())]);
                 match transcript_strand {
                     &Strand::Forward => {
                         let fx = feat(coding_r.0, min(end, coding_r.0 + 3),
@@ -1081,7 +1088,6 @@ fn infer_exon_features(
                     // a coding region must have at least 3 bases for the start codon
                     return Err(FeatureError::CodingTooSmall);
                 }
-                let mut exon = exn(start, end, vec![feat(start, coding_r.0, utr1.clone())]);
                 match transcript_strand {
                     &Strand::Forward => {
                         let fx = feat(coding_r.0, coding_r.0 + 3, StartCodon { frame: None });
@@ -1115,7 +1121,6 @@ fn infer_exon_features(
                     // coding region must have at least 3 bases
                     return Err(FeatureError::CodingTooSmall);
                 }
-                let mut exon = exn(start, end, vec![feat(start, coding_r.0, utr1.clone())]);
                 match transcript_strand {
                     &Strand::Forward => {
                         exon.features.push(feat(coding_r.0, coding_r.0 + 3,
@@ -1125,7 +1130,11 @@ fn infer_exon_features(
                         let fx = feat(coding_r.1, min(end, coding_r.1 + codon2_rem),
                                       StopCodon { frame: None });
                         codon2_rem -= fx.span();
+                        let codon2_end = fx.end();
                         exon.features.push(fx);
+                        if codon2_end < end {
+                            exon.features.push(feat(codon2_end, end, utr2.clone()));
+                        }
                     },
                     &Strand::Reverse => {
                         let fx = feat(max(start, coding_r.0 - codon2_rem), coding_r.0,
@@ -1139,12 +1148,13 @@ fn infer_exon_features(
                                       StartCodon { frame: None });
                         codon2_rem -= fx.span();
                         exon.features.push(fx);
+                        exon.features.push(feat(coding_r.1, end, utr2.clone()));
                     },
                     &Strand::Unknown => {
                         exon.features.push(feat(coding_r.0, coding_r.1, CDS { frame: None }));
+                        exon.features.push(feat(coding_r.1, end, utr2.clone()));
                     },
                 }
-                exon.features.push(feat(coding_r.1, end, utr2.clone()));
                 exons.push(exon);
 
             } else {
@@ -1211,7 +1221,11 @@ fn infer_exon_features(
                         let fx = feat(coding_r.1, min(end, coding_r.1 + codon2_rem),
                                       StopCodon { frame: None });
                         codon2_rem -= fx.span();
+                        let codon2_end = fx.end();
                         exon.features.push(fx);
+                        if codon2_end < end {
+                            exon.features.push(feat(codon2_end, end, utr2.clone()));
+                        }
                     },
                     &Strand::Reverse => {
                         codon1_rem = backtrack_and_push(&mut exons, StopCodon { frame: None },
@@ -1220,12 +1234,13 @@ fn infer_exon_features(
                         exon.features.push(feat(coding_r.1 - 3, coding_r.1,
                                                 StartCodon { frame: None }));
                         codon2_rem -= 3;
+                        exon.features.push(feat(coding_r.1, end, utr2.clone()));
                     },
                     &Strand::Unknown => {
                         exon.features.push(feat(start, coding_r.1, CDS { frame: None }));
+                        exon.features.push(feat(coding_r.1, end, utr2.clone()));
                     },
                 }
-                exon.features.push(feat(coding_r.1, end, utr2.clone()));
                 exons.push(exon);
 
             } else {
@@ -1289,8 +1304,11 @@ fn infer_exon_features(
                         let fx = feat(coding_r.1, min(coding_r.1 + codon2_rem, end),
                                       StopCodon { frame: None });
                         codon2_rem -= fx.span();
+                        let codon2_end = fx.end();
                         exon.features.push(fx);
-                        exon.features.push(feat(coding_r.1, end, utr2.clone()));
+                        if codon2_end < end {
+                            exon.features.push(feat(codon2_end, end, utr2.clone()));
+                        }
                     },
                     &Strand::Reverse => {
                         exon.features.push(feat(start, coding_r.1, CDS { frame: None }));
@@ -1322,16 +1340,24 @@ fn infer_exon_features(
                         let fx = feat(start, min(start + codon2_rem, end),
                                       StopCodon { frame: None });
                         codon2_rem -= fx.span();
+                        let codon2_end = fx.end();
                         exon.features.push(fx);
+                        if codon2_end < end {
+                            exon.features.push(feat(codon2_end, end, utr2.clone()));
+                        }
+                    } else {
+                        exon.features.push(feat(start, end, utr2.clone()));
                     }
                 },
                 &Strand::Reverse => {
                     codon2_rem = backtrack_and_push(
                         &mut exons, StartCodon { frame: None }, codon2_rem, &feat);
+                    exon.features.push(feat(start, end, utr2.clone()));
                 },
-                &Strand::Unknown => {},
+                &Strand::Unknown => {
+                    exon.features.push(feat(start, end, utr2.clone()));
+                },
             }
-            exon.features.push(feat(start, end, utr2.clone()));
             exons.push(exon);
 
         } else {
@@ -1364,6 +1390,23 @@ where F: Fn(u64, u64, ExonFeatureKind) -> ExonFeature
         let fx = feature_maker(max(exon.start(), exon.end() - codon_rem),
                                exon.end(), efk.clone());
         codon_rem -= fx.span();
+        let ofxp_start = exon.features.last()
+            .and_then(|fxp| {
+                match (fxp.kind(), fx.kind()) {
+                    (&UTR3, &StopCodon { .. }) => Some(fxp.start()),
+                    _ => None,
+                }
+            });
+        if let Some(fxp_start) = ofxp_start {
+            let adj_fxp_end = fx.start();
+            if fxp_start == adj_fxp_end {
+                exon.features.pop();
+            } else {
+                let n_fxs = exon.features.len();
+                let new_fxp_interval = Interval::new(fxp_start..adj_fxp_end).unwrap();
+                exon.features[n_fxs-1].interval = new_fxp_interval;
+            }
+        }
         exon.features.push(fx);
     }
     codon_rem

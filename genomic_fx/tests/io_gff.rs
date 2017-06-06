@@ -47,7 +47,7 @@ fn gtf_reader_single_gene() {
     let trx1_exon2 = [
         ((176189807, 176190139), EFK::CDS { frame: Some(2) }),
         ((176190139, 176190142), EFK::StopCodon { frame: Some(0) }),
-        ((176190139, 176190907), EFK::UTR3)];
+        ((176190142, 176190907), EFK::UTR3)];
     for (eidx, feat) in trx1.exons()[1].features().iter().enumerate() {
         assert_eq!(feat.start(), (trx1_exon2[eidx].0).0);
         assert_eq!(feat.end(), (trx1_exon2[eidx].0).1);
@@ -92,7 +92,7 @@ fn gtf_reader_multiple_transcripts() {
     let trx1_exon2 = [
         ((176189807, 176190139), EFK::CDS { frame: Some(2) }),
         ((176190139, 176190142), EFK::StopCodon { frame: Some(0) }),
-        ((176190139, 176190907), EFK::UTR3)];
+        ((176190142, 176190907), EFK::UTR3)];
     for (eidx, feat) in trx1.exons()[1].features().iter().enumerate() {
         assert_eq!(feat.start(), (trx1_exon2[eidx].0).0);
         assert_eq!(feat.end(), (trx1_exon2[eidx].0).1);
