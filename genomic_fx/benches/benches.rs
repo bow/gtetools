@@ -33,26 +33,15 @@ mod tests {
             EBuilder::new("chrT", 100, 300)
                 .strand(Strand::Forward)
                 .features(vec![
-                    ExonFeature {
-                        interval: Interval::new(100..150).unwrap(),
-                        kind: UTR5,
-                    },
-                    ExonFeature {
-                        interval: Interval::new(150..153).unwrap(),
-                        kind: StartCodon { frame: Some(0) },
-                    },
-                    ExonFeature {
-                        interval: Interval::new(150..300).unwrap(),
-                        kind: CDS { frame: Some(0) },
-                    },
-                    ExonFeature {
-                        interval: Interval::new(300..303).unwrap(),
-                        kind: StopCodon { frame: Some(0) },
-                    },
-                    ExonFeature {
-                        interval: Interval::new(300..500).unwrap(),
-                        kind: UTR3,
-                    },
+                    ExonFeature::new(Interval::new(100..150).unwrap(), UTR5),
+                    ExonFeature::new(Interval::new(150..153).unwrap(),
+                                     StartCodon { frame: Some(0) }),
+                    ExonFeature::new(Interval::new(150..300).unwrap(),
+                                     CDS { frame: Some(0) }),
+                    ExonFeature::new(Interval::new(300..303).unwrap(),
+                                     StopCodon { frame: Some(0) }),
+                    ExonFeature::new(Interval::new(303..500).unwrap(),
+                                     UTR3),
                 ])
                 .build()
         });
