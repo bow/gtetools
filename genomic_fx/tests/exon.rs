@@ -1,11 +1,11 @@
 extern crate bio;
 #[macro_use]
 extern crate matches;
+extern crate multimap;
 extern crate genomic_fx;
 
-use std::collections::HashMap;
-
 use bio::utils::{self, Interval, Strand};
+use multimap::MultiMap;
 
 use genomic_fx::{EBuilder, ExonFeature, ExonFeatureKind, FeatureError, Error};
 use FeatureError::{InvalidInterval, InvalidStrandChar};
@@ -17,7 +17,7 @@ fn make_feat(start: u64, end: u64, kind: ExonFeatureKind) -> ExonFeature {
 
 #[test]
 fn ebuilder_basic() {
-    let mut attribs = HashMap::new();
+    let mut attribs = MultiMap::new();
     attribs.insert("key1".to_owned(), "value1".to_owned());
     attribs.insert("key2".to_owned(), "value2".to_owned());
     let exonb = EBuilder::new("chrT", 10, 20)

@@ -1,10 +1,10 @@
 use std::cmp::{max, min};
-use std::collections::HashMap;
 use std::mem;
 
 use bio::utils::{self, Interval, IntervalError};
 use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
+use multimap::MultiMap;
 
 use {Coord, Error, RawTrxCoord, INIT_COORD};
 use self::ExonFeatureKind::*;
@@ -37,20 +37,20 @@ macro_rules! impl_common {
                 self.strand = strand
             }
 
-            pub fn attributes(&self) -> &HashMap<String, String> {
+            pub fn attributes(&self) -> &MultiMap<String, String> {
                 &self.attributes
             }
 
-            pub fn attributes_mut(&mut self) -> &mut HashMap<String, String> {
+            pub fn attributes_mut(&mut self) -> &mut MultiMap<String, String> {
                 &mut self.attributes
             }
 
-            pub fn set_attributes(&mut self, attributes: HashMap<String, String>) {
+            pub fn set_attributes(&mut self, attributes: MultiMap<String, String>) {
                 self.attributes = attributes
             }
 
-            pub fn take_attributes(&mut self) -> HashMap<String, String> {
-                mem::replace(&mut self.attributes, HashMap::new())
+            pub fn take_attributes(&mut self) -> MultiMap<String, String> {
+                mem::replace(&mut self.attributes, MultiMap::new())
             }
 
             pub fn interval(&self) -> &Interval<u64> {
@@ -153,7 +153,7 @@ pub struct Exon {
     id: Option<String>,
     gene_id: Option<String>,
     transcript_id: Option<String>,
-    attributes: HashMap<String, String>,
+    attributes: MultiMap<String, String>,
     features: Vec<ExonFeature>,
 }
 
@@ -219,7 +219,7 @@ pub struct EBuilder {
     id: Option<String>,
     transcript_id: Option<String>,
     gene_id: Option<String>,
-    attributes: HashMap<String, String>,
+    attributes: MultiMap<String, String>,
     features: Vec<ExonFeature>,
 }
 
@@ -237,7 +237,7 @@ impl EBuilder {
             id: None,
             transcript_id: None,
             gene_id: None,
-            attributes: HashMap::new(),
+            attributes: MultiMap::new(),
             features: Vec::new(),
         }
     }
@@ -280,7 +280,7 @@ impl EBuilder {
         self
     }
 
-    pub fn attributes(mut self, attributes: HashMap<String, String>) -> Self {
+    pub fn attributes(mut self, attributes: MultiMap<String, String>) -> Self {
         self.attributes = attributes;
         self
     }
@@ -321,7 +321,7 @@ pub struct Transcript {
     strand: Strand,
     id: Option<String>,
     gene_id: Option<String>,
-    attributes: HashMap<String, String>,
+    attributes: MultiMap<String, String>,
     exons: Vec<Exon>,
 }
 
@@ -464,7 +464,7 @@ pub struct TBuilder {
     strand_char: Option<char>,
     id: Option<String>,
     gene_id: Option<String>,
-    attributes: HashMap<String, String>,
+    attributes: MultiMap<String, String>,
     // Input can be a vector of pre-made features ...
     exons: Option<Vec<Exon>>,
     // Or exon coordinates, possibly coupled with cds coord
@@ -487,7 +487,7 @@ impl TBuilder {
             strand_char: None,
             id: None,
             gene_id: None,
-            attributes: HashMap::new(),
+            attributes: MultiMap::new(),
             exons: None,
             exon_coords: None,
             coding_coord: None,
@@ -526,7 +526,7 @@ impl TBuilder {
         self
     }
 
-    pub fn attributes(mut self, attributes: HashMap<String, String>) -> Self {
+    pub fn attributes(mut self, attributes: MultiMap<String, String>) -> Self {
         self.attributes = attributes;
         self
     }
@@ -584,7 +584,7 @@ pub struct Gene {
     interval: Interval<u64>,
     strand: Strand,
     id: Option<String>,
-    attributes: HashMap<String, String>,
+    attributes: MultiMap<String, String>,
     transcripts: LinkedHashMap<String, Transcript>,
 }
 
@@ -617,7 +617,7 @@ pub struct GBuilder {
     strand: Option<Strand>,
     strand_char: Option<char>,
     id: Option<String>,
-    attributes: HashMap<String, String>,
+    attributes: MultiMap<String, String>,
     transcripts: Option<LinkedHashMap<String, Transcript>>,
     transcript_coords: Option<LinkedHashMap<String, RawTrxCoord>>,
     transcript_coding_incl_stop: bool,
@@ -635,7 +635,7 @@ impl GBuilder {
             strand: None,
             strand_char: None,
             id: None,
-            attributes: HashMap::new(),
+            attributes: MultiMap::new(),
             transcripts: None,
             transcript_coords: None,
             transcript_coding_incl_stop: false,
@@ -666,7 +666,7 @@ impl GBuilder {
         self
     }
 
-    pub fn attributes(mut self, attributes: HashMap<String, String>) -> Self {
+    pub fn attributes(mut self, attributes: MultiMap<String, String>) -> Self {
         self.attributes = attributes;
         self
     }
@@ -948,7 +948,7 @@ fn infer_exons(
                         id: exon_id.map(|id| id.to_owned()),
                         transcript_id: transcript_id.map(|id| id.to_owned()),
                         gene_id: gene_id.map(|id| id.to_owned()),
-                        attributes: HashMap::new(),
+                        attributes: MultiMap::new(),
                         features: Vec::new(),
                     });
             }
@@ -1020,7 +1020,7 @@ fn infer_exon_features(
             id: exon_id.map(|v| v.to_owned()),
             transcript_id: transcript_id.map(|v| v.to_owned()),
             gene_id: gene_id.map(|v| v.to_owned()),
-            attributes: HashMap::new(),
+            attributes: MultiMap::new(),
             features: features,
         }
     };

@@ -1,17 +1,17 @@
 extern crate bio;
 extern crate genomic_fx;
 extern crate linked_hash_map;
-
-use std::collections::HashMap;
+extern crate multimap;
 
 use linked_hash_map::LinkedHashMap;
+use multimap::MultiMap;
 
 use genomic_fx::{Strand, GBuilder};
 use Strand::*;
 
 #[test]
 fn gbuilder_basic() {
-    let mut attribs = HashMap::new();
+    let mut attribs = MultiMap::new();
     attribs.insert("key1".to_owned(), "value1".to_owned());
     attribs.insert("key2".to_owned(), "value2".to_owned());
 

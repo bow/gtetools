@@ -2,14 +2,16 @@ extern crate bio;
 extern crate csv;
 extern crate itertools;
 extern crate linked_hash_map;
+extern crate multimap;
 #[macro_use]
 extern crate quick_error;
 
 use std::io::Error as StdIoError;
-use std::num::ParseIntError;
+use std::num::{ParseFloatError, ParseIntError};
 
 pub use bio::utils::Strand;
 pub use bio::io::gff::GffType;
+use bio::io::gff::GffError;
 use csv::Error as CsvError;
 
 mod feature;
@@ -41,6 +43,11 @@ quick_error! {
         Gff(string: &'static str) {
             description(string)
         }
+        GffBio(err: GffError) {
+            description(err.description())
+            from()
+            cause(err)
+        }
         Csv(err: CsvError) {
             description(err.description())
             from()
@@ -52,6 +59,11 @@ quick_error! {
             cause(err)
         }
         ParseInt(err: ParseIntError) {
+            description(err.description())
+            from()
+            cause(err)
+        }
+        ParseFloat(err: ParseFloatError) {
             description(err.description())
             from()
             cause(err)

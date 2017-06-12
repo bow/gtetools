@@ -1,7 +1,8 @@
 extern crate bio;
 extern crate genomic_fx;
+extern crate multimap;
 
-use std::collections::HashMap;
+use multimap::MultiMap;
 
 use genomic_fx::{ExonFeatureKind, Strand, TBuilder, Transcript};
 use ExonFeatureKind::*;
@@ -38,7 +39,7 @@ where T: IntoIterator<Item=(u64, u64)>
 
 #[test]
 fn tbuilder_basic() {
-    let mut attribs = HashMap::new();
+    let mut attribs = MultiMap::new();
     attribs.insert("key1".to_owned(), "value1".to_owned());
     attribs.insert("key2".to_owned(), "value2".to_owned());
     let btrx = TBuilder::new("chrT", 100, 1000)

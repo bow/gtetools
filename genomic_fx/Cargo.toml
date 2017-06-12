@@ -4,11 +4,13 @@ version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 
 [dependencies]
-bio = { git = "https://github.com/bow/rust-bio.git", rev = "ef66f770" }
-csv = "~0.15.0"
-itertools = "~0.6.0"
+bio = { git = "https://github.com/bow/rust-bio.git", branch = "sf/gff-structs" }
+csv = "~0.15"
+itertools = "~0.6"
 linked-hash-map = "~0.4"
-quick-error = "~1.1.0"
+multimap = "~0.4"
+quick-error = "~1.2"
+regex = "~0.2"
 
 [dev-dependencies]
 matches = "~0.1.4"

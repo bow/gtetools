@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::cmp::{max, min};
 use std::convert::AsRef;
 use std::io;
@@ -9,6 +8,7 @@ use std::path::Path;
 use bio::io::gff::{self, GffType};
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
+use multimap::MultiMap;
 
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, TBuilder, Error,
      RawTrxCoord, INIT_COORD};
@@ -26,6 +26,7 @@ const STOP_CODON_STR: &'static str = "stop_codon";
 
 // Value for unknown columns.
 const UNK_STR: &'static str = ".";
+const UNK_CHAR: char = '.';
 
 // Commonly-used attribute keys.
 const GENE_ID_STR: &'static str = "gene_id";
@@ -117,7 +118,7 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
                     .expect("'gene_id' attribute not found")
                     .clone();
                 let seq_name = res.seqname().to_owned();
-                let strand = res.strand().unwrap_or(Strand::Unknown);
+                let strand = res.strand();
 
                 (seq_name, gene_id, strand)
             })
@@ -143,21 +144,28 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
                     let rtrx_entry = rec.attributes_mut()
                         .remove(TRANSCRIPT_ID_STR)
                         .ok_or(Error::Gff("required 'transcript_id' attribute not found"))
+                        .and_then(|mut ids| {
+                            if ids.len() > 1 {
+                                Err(Error::Gff("more than one 'transcript_id' present"))
+                            } else {
+                                Ok(ids.pop().unwrap())
+                            }
+                        })
                         .map(|id| trx_coords.entry(id).or_insert((INIT_COORD, vec![], None)));
 
                     match rec.feature_type() {
-                        GENE_STR => {
+                        Some(GENE_STR) => {
                             gene_coord = adjust_coord(gene_coord, &rec);
                         },
-                        TRANSCRIPT_STR => {
+                        Some(TRANSCRIPT_STR) => {
                             let trx_entry = rtrx_entry?;
                             trx_entry.0 = adjust_coord(trx_entry.0, &rec);
                         },
-                        EXON_STR => {
+                        Some(EXON_STR) => {
                             let trx_entry = rtrx_entry?;
-                            (trx_entry.1).push((*rec.start() - 1, *rec.end()));
+                            (trx_entry.1).push((rec.start(), rec.end()));
                         },
-                        CDS_STR => {
+                        Some(CDS_STR) => {
                             let trx_entry = rtrx_entry?;
                             trx_entry.2 = (trx_entry.2).or(Some(INIT_COORD))
                                 .map(|coord| adjust_coord(coord, &rec));
@@ -221,7 +229,7 @@ impl<'a, R> GffTranscripts<'a, R> where R: io::Read {
                     .expect("'transcript_id' attribute not found")
                     .clone();
                 let seq_name = res.seqname().to_owned();
-                let strand = res.strand().unwrap_or(Strand::Unknown);
+                let strand = res.strand();
 
                 (seq_name, gene_id, transcript_id, strand)
             })
@@ -249,13 +257,13 @@ impl<'a, R> GffTranscripts<'a, R> where R: io::Read {
                     rec.attributes_mut().remove(TRANSCRIPT_ID_STR);
 
                     match rec.feature_type() {
-                        TRANSCRIPT_STR => {
+                        Some(TRANSCRIPT_STR) => {
                             trx_coord = adjust_coord(trx_coord, &rec);
                         },
-                        EXON_STR => {
-                            exn_coords.push((*rec.start() - 1, *rec.end()));
+                        Some(EXON_STR) => {
+                            exn_coords.push((rec.start(), rec.end()));
                         },
-                        CDS_STR => {
+                        Some(CDS_STR) => {
                             coding_coord = (coding_coord).or(Some(INIT_COORD))
                                 .map(|coord| adjust_coord(coord, &rec));
                         },
@@ -284,25 +292,6 @@ impl<'a, R> Iterator for GffTranscripts<'a, R> where R: io::Read {
     }
 }
 
-struct GffRow(String, String, String, u64, u64, String, String, String, HashMap<String, String>);
-
-
-impl From<GffRow> for gff::Record {
-    fn from(row: GffRow) -> Self {
-        let mut rec = gff::Record::default();
-        *rec.seqname_mut() = row.0;
-        *rec.source_mut() = row.1;
-        *rec.feature_type_mut() = row.2;
-        *rec.start_mut() = row.3 + 1;
-        *rec.end_mut() = row.4;
-        *rec.score_mut() = row.5;
-        *rec.strand_mut() = row.6;
-        *rec.frame_mut() = row.7;
-        *rec.attributes_mut() = row.8;
-        rec
-    }
-}
-
 impl Gene {
 
     #[inline(always)]
@@ -316,21 +305,24 @@ impl Gene {
     pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
         let mut attribs = self.take_attributes();
-        let (source, score) = extract_source_score(&mut attribs);
 
         self.id()
             .ok_or(Error::Gff("required gene 'id' value not found"))
             .map(|gid| attribs.insert(GENE_ID_STR.to_owned(), gid.to_owned()))?;
 
-        let strand = strand_to_string(self.strand());
+        let (source, score) = extract_source_score(&mut attribs);
 
         let mut recs = Vec::with_capacity(self.num_records());
 
-        let row = GffRow(
-            self.seq_name().to_owned(), source, GENE_STR.to_owned(),
-            self.start(), self.end(), score, strand.to_owned(),
-            UNK_STR.to_owned(), attribs);
-        recs.push(gff::Record::from(row));
+        let gx_record = gff::RecordBuilder::new(self.seq_name(), self.start(), self.end())
+            .source(source)
+            .feature_type(GENE_STR)
+            .score(score)
+            .strand(strand_to_char(&self.strand()))
+            .frame(UNK_CHAR)
+            .attributes(attribs)
+            .build()?;
+        recs.push(gx_record);
 
         for (_, transcript) in self.take_transcripts() {
             recs.append(&mut transcript.into_gff_records()?);
@@ -353,7 +345,6 @@ impl Transcript {
     pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
         let mut attribs = self.take_attributes();
-        let (source, score) = extract_source_score(&mut attribs);
 
         self.gene_id()
             .ok_or(Error::Gff("required 'gene_id' value not found"))
@@ -363,15 +354,19 @@ impl Transcript {
             .ok_or(Error::Gff("required transcript 'id' value not found"))
             .map(|tid| attribs.insert(TRANSCRIPT_ID_STR.to_owned(), tid.to_owned()))?;
 
-        let strand = strand_to_string(self.strand());
+        let (source, score) = extract_source_score(&mut attribs);
 
         let mut recs = Vec::with_capacity(self.num_records());
 
-        let trx_row =
-            GffRow(self.seq_name().to_owned(), source, TRANSCRIPT_STR.to_owned(),
-                   self.start(), self.end(), score,
-                   strand.to_owned(), UNK_STR.to_owned(), attribs);
-        recs.push(gff::Record::from(trx_row));
+        let trx_record = gff::RecordBuilder::new(self.seq_name(), self.start(), self.end())
+            .source(source)
+            .feature_type(TRANSCRIPT_STR)
+            .score(score)
+            .strand(strand_to_char(&self.strand()))
+            .frame(UNK_CHAR)
+            .attributes(attribs)
+            .build()?;
+        recs.push(trx_record);
 
         for exon in self.take_exons() {
             recs.append(&mut exon.into_gff_records()?);
@@ -384,17 +379,17 @@ impl Transcript {
 impl EFK {
 
     #[inline(always)]
-    fn get_feature_frame(&self) -> (String, String) {
+    fn get_feature_frame(&self) -> (String, char) {
         let (feature, frame) = match self {
-            &EFK::UTR => (UTR_STR, UNK_STR),
-            &EFK::UTR5 => (UTR5_STR, UNK_STR),
-            &EFK::UTR3 => (UTR3_STR, UNK_STR),
-            &EFK::CDS { frame: ref f } => (CDS_STR, frame_to_str(f)),
-            &EFK::StopCodon { frame: ref f } => (STOP_CODON_STR, frame_to_str(f)),
-            &EFK::StartCodon { frame: ref f } => (START_CODON_STR, frame_to_str(f)),
-            &EFK::Any(ref s) => (s.as_str(), UNK_STR),
+            &EFK::UTR => (UTR_STR, UNK_CHAR),
+            &EFK::UTR5 => (UTR5_STR, UNK_CHAR),
+            &EFK::UTR3 => (UTR3_STR, UNK_CHAR),
+            &EFK::CDS { frame: ref f } => (CDS_STR, frame_to_char(f)),
+            &EFK::StopCodon { frame: ref f } => (STOP_CODON_STR, frame_to_char(f)),
+            &EFK::StartCodon { frame: ref f } => (START_CODON_STR, frame_to_char(f)),
+            &EFK::Any(ref s) => (s.as_str(), UNK_CHAR),
         };
-        (feature.to_owned(), frame.to_owned())
+        (feature.to_owned(), frame)
     }
 }
 
@@ -403,7 +398,6 @@ impl Exon {
     pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
 
         let mut attribs = self.take_attributes();
-        let (source, score) = extract_source_score(&mut attribs);
 
         self.gene_id()
             .ok_or(Error::Gff("required 'gene_id' value not found"))
@@ -413,24 +407,33 @@ impl Exon {
             .ok_or(Error::Gff("required 'transcript_id' value not found"))
             .map(|tid| attribs.insert(TRANSCRIPT_ID_STR.to_owned(), tid.to_owned()))?;
 
-        let strand = strand_to_string(self.strand());
+        let (source, score) = extract_source_score(&mut attribs);
 
         let mut recs = Vec::with_capacity(1 + self.features().len());
 
         for (idx, fx) in self.features().iter().enumerate() {
             let (feature, frame) = fx.kind().get_feature_frame();
-            let fx_row =
-                GffRow(self.seq_name().to_owned(), source.clone(), feature,
-                       self.start(), self.end(), UNK_STR.to_owned(),
-                       strand.to_owned(), frame, attribs.clone());
-            recs[1 + idx] = gff::Record::from(fx_row);
+            let fx_record = gff::RecordBuilder::new(self.seq_name(), fx.start(), fx.end())
+                .source(source.as_str())
+                .feature_type(feature.as_str())
+                .score(score.as_str())
+                .strand(strand_to_char(&self.strand()))
+                .frame(frame)
+                .attributes(attribs.clone())
+                .build()?;
+
+            recs[1 + idx] = fx_record;
         }
 
-        let exon_row =
-            GffRow(self.seq_name().to_owned(), source.clone(), EXON_STR.to_owned(),
-                   self.start(), self.end(), score, strand.to_owned(),
-                   UNK_STR.to_owned(), attribs);
-        recs[0] = gff::Record::from(exon_row);
+        let exn_record = gff::RecordBuilder::new(self.seq_name(), self.start(), self.end())
+            .source(source.as_str())
+            .feature_type(EXON_STR)
+            .score(score.as_str())
+            .strand(strand_to_char(&self.strand()))
+            .frame(UNK_CHAR)
+            .attributes(attribs)
+            .build()?;
+        recs[0] = exn_record;
 
         Ok(recs)
     }
@@ -438,33 +441,36 @@ impl Exon {
 
 #[inline(always)]
 fn adjust_coord(cur_coord: Coord<u64>, record: &gff::Record) -> Coord<u64> {
-    (min(cur_coord.0, *record.start() - 1),
-     max(cur_coord.1, *record.end()))
+    (min(cur_coord.0, record.start()),
+     max(cur_coord.1, record.end()))
 }
 
 #[inline(always)]
-fn extract_source_score(attributes: &mut HashMap<String, String>) -> (String, String) {
-    let source = attributes.remove("source").unwrap_or(UNK_STR.to_owned());
-    let score = attributes.remove("score").unwrap_or(UNK_STR.to_owned());
+fn extract_source_score(attributes: &mut MultiMap<String, String>) -> (String, String) {
+    let source = attributes.remove("source")
+        .and_then(|mut vec| vec.pop())
+        .unwrap_or(UNK_STR.to_owned());
+    let score = attributes.remove("score")
+        .and_then(|mut vec| vec.pop())
+        .unwrap_or(UNK_STR.to_owned());
     (source, score)
 }
 
 #[inline(always)]
-fn strand_to_string(strand: &Strand) -> String {
-    let value = match strand {
-        &Strand::Forward => "+",
-        &Strand::Reverse => "-",
-        &Strand::Unknown => UNK_STR,
-    };
-    value.to_owned()
+fn strand_to_char(strand: &Strand) -> char {
+    match strand {
+        &Strand::Forward => '+',
+        &Strand::Reverse => '-',
+        &Strand::Unknown => UNK_CHAR,
+    }
 }
 
 #[inline(always)]
-fn frame_to_str(frame: &Option<u8>) -> &str {
+fn frame_to_char(frame: &Option<u8>) -> char {
     match frame {
-        &Some(0) => "0",
-        &Some(1) => "1",
-        &Some(2) => "2",
-        _ => UNK_STR,
+        &Some(0) => '0',
+        &Some(1) => '1',
+        &Some(2) => '2',
+        _ => UNK_CHAR,
     }
 }
