@@ -15,6 +15,39 @@ use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, TB
 use consts::*;
 
 
+quick_error! {
+    #[derive(Debug)]
+    pub enum GffError {
+        MissingGeneId {
+            description("required 'gene_id' attribute not found")
+        }
+        MissingTranscriptId {
+            description("required 'transcript_id' attribute not found")
+        }
+        MultipleTranscriptIds {
+            description("more than one 'transcript_id' found")
+        }
+        StopCodonInCds {
+            description("'stop_codon' feature intersects cds")
+        }
+        MissingTranscript {
+            description("no 'transcript' feature present")
+        }
+        MultipleTranscripts {
+            description("multiple 'transcript' features present")
+        }
+        OrphanStop {
+            description("stop codon exists without start codon")
+        }
+        OrphanStart {
+            description("start codon exists without stop codon")
+        }
+        OrphanCds {
+            description("cds exists without start and/or stop codon")
+        }
+    }
+}
+
 pub struct Reader<R: io::Read> {
     inner: gff::Reader<R>,
     pub(crate) gff_type: GffType,
@@ -147,10 +180,10 @@ impl<'a, R> GffGenes<'a, R> where R: io::Read {
 
                     let rtrx_entry = rec.attributes_mut()
                         .remove(TRANSCRIPT_ID_STR)
-                        .ok_or(Error::Gff("required 'transcript_id' attribute not found"))
+                        .ok_or(GffError::MissingTranscriptId)
                         .and_then(|mut ids| {
                             if ids.len() > 1 {
-                                Err(Error::Gff("more than one 'transcript_id' present"))
+                                Err(GffError::MultipleTranscriptIds)
                             } else {
                                 Ok(ids.pop().unwrap())
                             }
@@ -195,6 +228,7 @@ impl<'a, R> Iterator for GffGenes<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_gene).next()
+            .map(|res| res.map_err(Error::from))
     }
 }
 
@@ -293,6 +327,7 @@ impl<'a, R> Iterator for GffTranscripts<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_transcript).next()
+            .map(|res| res.map_err(Error::from))
     }
 }
 
@@ -311,7 +346,7 @@ impl Gene {
         let mut attribs = self.take_attributes();
 
         self.id()
-            .ok_or(Error::Gff("required gene 'id' value not found"))
+            .ok_or(GffError::MissingGeneId)
             .map(|gid| attribs.insert(GENE_ID_STR.to_owned(), gid.to_owned()))?;
 
         let (source, score) = extract_source_score(&mut attribs);
@@ -351,11 +386,11 @@ impl Transcript {
         let mut attribs = self.take_attributes();
 
         self.gene_id()
-            .ok_or(Error::Gff("required 'gene_id' value not found"))
+            .ok_or(GffError::MissingGeneId)
             .map(|gid| attribs.insert(GENE_ID_STR.to_owned(), gid.to_owned()))?;
 
         self.id()
-            .ok_or(Error::Gff("required transcript 'id' value not found"))
+            .ok_or(GffError::MissingTranscriptId)
             .map(|tid| attribs.insert(TRANSCRIPT_ID_STR.to_owned(), tid.to_owned()))?;
 
         let (source, score) = extract_source_score(&mut attribs);
@@ -404,11 +439,11 @@ impl Exon {
         let mut attribs = self.take_attributes();
 
         self.gene_id()
-            .ok_or(Error::Gff("required 'gene_id' value not found"))
+            .ok_or(GffError::MissingGeneId)
             .map(|gid| attribs.insert(GENE_ID_STR.to_owned(), gid.to_owned()))?;
 
         self.transcript_id()
-            .ok_or(Error::Gff("required 'transcript_id' value not found"))
+            .ok_or(GffError::MissingTranscriptId)
             .map(|tid| attribs.insert(TRANSCRIPT_ID_STR.to_owned(), tid.to_owned()))?;
 
         let (source, score) = extract_source_score(&mut attribs);

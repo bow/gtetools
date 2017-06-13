@@ -11,7 +11,7 @@ use std::num::{ParseFloatError, ParseIntError};
 
 pub use bio::utils::Strand;
 pub use bio::io::gff::GffType;
-use bio::io::gff::GffError;
+use bio::io::gff;
 use csv::Error as CsvError;
 
 mod feature;
@@ -27,7 +27,8 @@ pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
 
 mod io_gff;
 pub use io_gff::{Reader as GffReader,
-                 GffGenes, GffTranscripts};
+                 GffError, GffGenes, GffTranscripts};
+
 
 quick_error! {
     #[derive(Debug)]
@@ -40,10 +41,12 @@ quick_error! {
         RefFlat(string: &'static str) {
             description(string)
         }
-        Gff(string: &'static str) {
-            description(string)
+        Gff(err: GffError) {
+            description(err.description())
+            from()
+            cause(err)
         }
-        GffBio(err: GffError) {
+        BioGff(err: gff::GffError) {
             description(err.description())
             from()
             cause(err)
