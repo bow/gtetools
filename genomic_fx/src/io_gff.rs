@@ -17,6 +17,7 @@ use consts::*;
 
 pub struct Reader<R: io::Read> {
     inner: gff::Reader<R>,
+    pub(crate) gff_type: GffType,
 }
 
 impl<R: io::Read> Reader<R> {
@@ -24,6 +25,7 @@ impl<R: io::Read> Reader<R> {
     pub fn from_reader(in_reader: R, gff_type: GffType) -> Reader<R> {
         Reader {
             inner: gff::Reader::new(in_reader, gff_type),
+            gff_type: gff_type.clone(),
         }
     }
 
