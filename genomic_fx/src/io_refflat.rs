@@ -271,7 +271,7 @@ impl<W: io::Write> Writer<W> {
 
         let (coding_start, coding_end) = transcript.coding_coord(true)
             .unwrap_or((transcript.end(), transcript.end()));
-        let (exon_starts, exon_ends) = Self::coords_field(&transcript);
+        let (exon_starts, exon_ends) = transcript.coords_field();
 
         self.inner
             .encode((transcript.gene_id(), transcript_name, transcript.seq_name(), strand_char,
@@ -287,12 +287,15 @@ impl<W: io::Write> Writer<W> {
         }
         Ok(())
     }
+}
+
+impl Transcript {
 
     #[inline(always)]
-    fn coords_field(trx: &Transcript) -> (String, String) {
-        let mut starts = trx.exons().iter().map(|exon| exon.start()).join(",");
+    fn coords_field(&self) -> (String, String) {
+        let mut starts = self.exons().iter().map(|exon| exon.start()).join(",");
         starts.push(',');
-        let mut ends = trx.exons().iter().map(|exon| exon.end()).join(",");
+        let mut ends = self.exons().iter().map(|exon| exon.end()).join(",");
         ends.push(',');
         (starts, ends)
     }
