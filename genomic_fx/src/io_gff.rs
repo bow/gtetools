@@ -50,6 +50,12 @@ impl<R: io::Read> Reader<R> {
             inner: self.inner.records()
         }
     }
+
+    pub(crate) fn raw_rows(&mut self) -> GffRawRows<R> {
+        GffRawRows {
+            inner: self.inner.raw_rows()
+        }
+    }
 }
 
 impl Reader<fs::File> {
@@ -67,6 +73,20 @@ impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
     type Item = Result<gff::Record, Error>;
 
     fn next(&mut self) -> Option<Result<gff::Record, Error>> {
+        self.inner.next()
+            .map(|row| row.map_err(Error::from))
+    }
+}
+
+pub(crate) struct GffRawRows<'a, R: 'a> where R: io::Read {
+    inner: gff::RawRows<'a, R>,
+}
+
+impl<'a, R> Iterator for GffRawRows<'a, R> where R: io::Read {
+
+    type Item = Result<gff::RawRow, Error>;
+
+    fn next(&mut self) -> Option<Result<gff::RawRow, Error>> {
         self.inner.next()
             .map(|row| row.map_err(Error::from))
     }
