@@ -43,7 +43,7 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    fn records(&mut self) -> GffRecords<R> {
+    pub(crate) fn records(&mut self) -> GffRecords<R> {
         GffRecords {
             inner: self.inner.records()
         }
@@ -56,7 +56,7 @@ impl Reader<fs::File> {
     }
 }
 
-struct GffRecords<'a, R: 'a> where R: io::Read {
+pub(crate) struct GffRecords<'a, R: 'a> where R: io::Read {
     inner: gff::Records<'a, R>,
 }
 
