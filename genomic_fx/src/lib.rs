@@ -77,5 +77,29 @@ type Coord<T> = (T, T);
 // Helper type alias for raw transcript coordinate inputs
 type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
 
-// Initial coordinate for features.
-const INIT_COORD: (u64, u64) = (::std::u64::MAX, ::std::u64::MIN);
+// Crate-wide constants
+mod consts {
+    // Initial coordinate for features.
+    pub(crate) const INIT_START: u64 = ::std::u64::MAX;
+    pub(crate) const INIT_END: u64 = ::std::u64::MIN;
+    pub(crate) const INIT_COORD: (u64, u64) = (INIT_START, INIT_END);
+
+    // Various commonly-used feature column values
+    pub(crate) const GENE_STR: &'static str = "gene";
+    pub(crate) const TRANSCRIPT_STR: &'static str = "transcript";
+    pub(crate) const EXON_STR: &'static str = "exon";
+    pub(crate) const UTR_STR: &'static str = "UTR";
+    pub(crate) const UTR5_STR: &'static str = "UTR5";
+    pub(crate) const UTR3_STR: &'static str = "UTR3";
+    pub(crate) const CDS_STR: &'static str = "CDS";
+    pub(crate) const START_CODON_STR: &'static str = "start_codon";
+    pub(crate) const STOP_CODON_STR: &'static str = "stop_codon";
+
+    // Value for unknown columns.
+    pub(crate) const UNK_STR: &'static str = ".";
+    pub(crate) const UNK_CHAR: char = '.';
+
+    // Commonly-used attribute keys.
+    pub(crate) const GENE_ID_STR: &'static str = "gene_id";
+    pub(crate) const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
+}

@@ -11,26 +11,8 @@ use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, TBuilder, Error,
-     RawTrxCoord, INIT_COORD};
-
-// Various commonly-used feature column values
-const GENE_STR: &'static str = "gene";
-const TRANSCRIPT_STR: &'static str = "transcript";
-const EXON_STR: &'static str = "exon";
-const UTR_STR: &'static str = "UTR";
-const UTR5_STR: &'static str = "UTR5";
-const UTR3_STR: &'static str = "UTR3";
-const CDS_STR: &'static str = "CDS";
-const START_CODON_STR: &'static str = "start_codon";
-const STOP_CODON_STR: &'static str = "stop_codon";
-
-// Value for unknown columns.
-const UNK_STR: &'static str = ".";
-const UNK_CHAR: char = '.';
-
-// Commonly-used attribute keys.
-const GENE_ID_STR: &'static str = "gene_id";
-const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
+     RawTrxCoord};
+use consts::*;
 
 
 pub struct Reader<R: io::Read> {
