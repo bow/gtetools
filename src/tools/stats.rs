@@ -16,6 +16,6 @@ pub fn build_cli<'a, 'b>() -> App<'a, 'b> {
                     .required(true))
 }
 
-pub fn run(args: &ArgMatches) -> Result<(), &'static str> {
+pub fn run(args: &ArgMatches) -> ::Result<()> {
     unimplemented!()
 }

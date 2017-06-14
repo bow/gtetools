@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate quick_error;
 
-use std::process;
 use std::io::{self, Write};
+use std::process;
+use std::result;
 
 use clap::{App, AppSettings, ArgMatches};
 
@@ -28,8 +31,30 @@ file formats. Submit bug reports, feature requests, or view the source code
 at https://github.com/bow/gtetools.";
 
 
+quick_error! {
+    #[derive(Debug)]
+    pub enum Error {
+        Gte(err: gte::Error) {
+            description(err.description())
+            from()
+            cause(err)
+        }
+        Io(err: io::Error) {
+            description(err.description())
+            from()
+            cause(err)
+        }
+        Other(msg: &'static str) {
+            description(msg)
+        }
+    }
+}
+
+type Result<T> = result::Result<T, Error>;
+
+
 /// Constructs a new `clap::App` for argument parsing.
-pub fn build_cli<'a, 'b>() -> App<'a, 'b> {
+fn build_cli<'a, 'b>() -> App<'a, 'b> {
     App::new("gtetools")
         .version(crate_version!())
         .author(crate_authors!())
@@ -45,13 +70,13 @@ pub fn build_cli<'a, 'b>() -> App<'a, 'b> {
 }
 
 /// Runs the appropriate tool given the subcommand argument matches.
-pub fn run(matches: ArgMatches) -> Result<(), &'static str> {
+fn run(matches: ArgMatches) -> ::Result<()> {
     match matches.subcommand() {
         (tools::stats::NAME, Some(m)) => tools::stats::run(m),
         (tools::gff_to_refflat::NAME, Some(m)) => tools::gff_to_refflat::run(m),
         // We should not reach this point since we already require
         // that subcommands must be present in the app settings.
-        _ => Err("Unexpected subcommand parsing error"),
+        _ => Err(Error::Other("unexpected command line parsing error")),
     }
 }
 
