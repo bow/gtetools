@@ -1,9 +1,9 @@
 extern crate bio;
-extern crate genomic_fx;
+extern crate gte;
 
 use std::io;
 
-use genomic_fx::{GffType, GffReader,
+use gte::{GffType, GffReader,
                  GffGenesStream, GffTranscriptsStream,
                  Gene, Transcript, ExonFeatureKind as EFK, Strand};
 use Strand::*;

@@ -1,12 +1,12 @@
 extern crate bio;
-extern crate genomic_fx;
+extern crate gte;
 extern crate linked_hash_map;
 extern crate multimap;
 
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
-use genomic_fx::{Strand, GBuilder};
+use gte::{Strand, GBuilder};
 use Strand::*;
 
 #[test]

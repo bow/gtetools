@@ -2,12 +2,12 @@ extern crate bio;
 #[macro_use]
 extern crate matches;
 extern crate multimap;
-extern crate genomic_fx;
+extern crate gte;
 
 use bio::utils::{self, Interval, Strand};
 use multimap::MultiMap;
 
-use genomic_fx::{EBuilder, ExonFeature, ExonFeatureKind, FeatureError, Error};
+use gte::{EBuilder, ExonFeature, ExonFeatureKind, FeatureError, Error};
 use FeatureError::{InvalidInterval, InvalidStrandChar};
 use ExonFeatureKind::*;
 

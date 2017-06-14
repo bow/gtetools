@@ -1,10 +1,10 @@
 extern crate bio;
-extern crate genomic_fx;
+extern crate gte;
 extern crate multimap;
 
 use multimap::MultiMap;
 
-use genomic_fx::{ExonFeatureKind, Strand, TBuilder, Transcript};
+use gte::{ExonFeatureKind, Strand, TBuilder, Transcript};
 use ExonFeatureKind::*;
 use Strand::*;
 

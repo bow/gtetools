@@ -1,9 +1,9 @@
 [root]
-name = "gnftools"
+name = "gtetools"
 version = "0.1.0"
 dependencies = [
  "clap 2.20.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "genomic_fx 0.1.0",
+ "gte 0.1.0",
 ]
 
 [[package]]
@@ -104,7 +104,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "genomic_fx"
+name = "gte"
 version = "0.1.0"
 dependencies = [
  "bio 0.13.0 (git+https://github.com/bow/rust-bio.git?branch=sf/gff-structs)",

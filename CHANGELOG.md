@@ -4,4 +4,4 @@
 
 `release date: TBD`
 
-Initial release of gnftools.
+Initial release of gtetools.

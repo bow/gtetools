@@ -1,12 +1,12 @@
 extern crate bio;
 extern crate linked_hash_map;
-extern crate genomic_fx;
+extern crate gte;
 
 use std::io;
 
 use linked_hash_map::LinkedHashMap;
 
-use genomic_fx::{RefFlatReader, RefFlatWriter, RefFlatRecord,
+use gte::{RefFlatReader, RefFlatWriter, RefFlatRecord,
                  RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream,
                  Transcript, TBuilder, Gene, GBuilder, Strand};
 

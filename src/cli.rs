@@ -16,9 +16,9 @@ OPTIONS:
 {unified}";
 
 const ABOUT: &'static str = "
-gnftools is a collection of tools for working with various gene annotation
+gtetools is a collection of tools for working with various gene annotation
 file formats. Submit bug reports, feature requests, or view the source code
-at https://github.com/bow/gnftools.";
+at https://github.com/bow/gtetools.";
 
 const TEMPLATE_SUBCMD: &'static str = "
 USAGE:
@@ -32,7 +32,7 @@ OPTIONS:
 
 /// Constructs a new `clap::App` for argument parsing.
 pub fn build_cli() -> App<'static, 'static> {
-    App::new("gnftools")
+    App::new("gtetools")
         .version(crate_version!())
         .author(crate_authors!())
         .about(ABOUT)

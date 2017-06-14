@@ -1,7 +1,7 @@
 #![feature(test)]
 
 extern crate bio;
-extern crate genomic_fx;
+extern crate gte;
 extern crate linked_hash_map;
 extern crate test;
 
@@ -10,7 +10,7 @@ use test::Bencher;
 use bio::utils::{Interval, Strand};
 use linked_hash_map::LinkedHashMap;
 
-use genomic_fx::{ExonFeature, ExonFeatureKind, EBuilder, TBuilder, GBuilder, RefFlatReader};
+use gte::{ExonFeature, ExonFeatureKind, EBuilder, TBuilder, GBuilder, RefFlatReader};
 use ExonFeatureKind::*;
 
 

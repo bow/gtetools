@@ -1,5 +1,5 @@
 [package]
-name = "genomic_fx"
+name = "gte"
 version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
 
