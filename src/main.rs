@@ -38,6 +38,7 @@ quick_error! {
     pub enum Error {
         Gte(err: gte::Error) {
             description(err.description())
+            display("{}", err)
             from()
             cause(err)
         }

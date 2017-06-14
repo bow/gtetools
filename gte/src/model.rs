@@ -1,13 +1,16 @@
 use std::cmp::{max, min};
 use std::mem;
+use std::error::Error;
 
 use bio::utils::{self as bio_utils, Interval, IntervalError};
 use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
-use {Coord, Error, RawTrxCoord, consts};
+use {Coord, RawTrxCoord, consts};
+use consts::DEF_ID;
 use utils::OptionDeref;
+
 use self::ExonFeatureKind::*;
 
 
@@ -298,9 +301,9 @@ impl EBuilder {
 
     pub fn build(self) -> ::Result<Exon> {
         let interval = coord_to_interval(self.start, self.end)
-            .map_err(Error::Feature)?;
+            .map_err(::Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
-            .map_err(Error::Feature)?;
+            .map_err(::Error::Feature)?;
         let feature = Exon {
             seq_name: self.seq_name,
             interval: interval,
@@ -557,14 +560,14 @@ impl TBuilder {
 
     pub fn build(self) -> ::Result<Transcript> {
         let interval = coord_to_interval(self.start, self.end)
-            .map_err(Error::Feature)?;
+            .map_err(::Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
-            .map_err(Error::Feature)?;
+            .map_err(::Error::Feature)?;
         let exons = resolve_exons_input(
             &self.seq_name, &interval, &strand, self.id.as_deref(),
             self.gene_id.as_deref(), None, // TODO: allow for exon IDs here
             self.exons, self.exon_coords.as_ref(), self.coding_coord,
-            self.coding_incl_stop).map_err(Error::Feature)?;
+            self.coding_incl_stop).map_err(::Error::Feature)?;
 
         let transcript = Transcript {
             seq_name: self.seq_name,
@@ -730,33 +733,51 @@ quick_error! {
         UnspecifiedStrand {
             description("strand not specified")
         }
-        InvalidExonInterval {
+        InvalidExonInterval(tid: Option<String>) {
             description("exon has larger start than end coordinate")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        InvalidCodingInterval {
+        InvalidCodingInterval(tid: Option<String>) {
             description("coding region has larger start than end coordinate")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        UnspecifiedExons {
+        UnspecifiedExons(tid: Option<String>) {
             description("transcript is defined without exons")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        UnmatchedExons {
+        UnmatchedExons(tid: Option<String>) {
             description("first and/or last exon coordinates do not match transcript \
                          start and/or end coordinates")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        CodingTooLarge {
+        CodingTooLarge(tid: Option<String>) {
             description("coding region leaves no room for stop codon in transcript")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        CodingTooSmall {
+        CodingTooSmall(tid: Option<String>) {
             description("coding region leaves no room for start codon")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        CodingNotFullyEnveloped {
+        CodingNotFullyEnveloped(tid: Option<String>) {
             description("coding region not fully enveloped by exons")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        CodingInIntron {
+        CodingInIntron(tid: Option<String>) {
             description("coding start and/or end lies in introns")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        TranscriptNotFullyEnveloped {
+        TranscriptNotFullyEnveloped(tid: Option<String>) {
             description("transcript coordinate not fully enveloped in gene coordinate")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
     }
 }
@@ -804,7 +825,8 @@ fn resolve_exons_input(
         (None, None, None) => Ok(Vec::new()),
 
         // only CDS defined -> must be an error
-        (None, None, Some(_)) => Err(FeatureError::UnspecifiedExons),
+        (None, None, Some(_)) => Err(
+            FeatureError::UnspecifiedExons(transcript_id.map(|tid| tid.to_owned()))),
 
         // features defined ~ takes precedence over coords (GTF input, since we need
         // to construct the tx features first to store its annotations)
@@ -826,7 +848,7 @@ fn resolve_transcripts_input(
     transcripts: Option<LinkedHashMap<String, Transcript>>,
     transcript_coords: Option<LinkedHashMap<String, RawTrxCoord>>,
     transcript_coding_incl_stop: bool
-) -> Result<LinkedHashMap<String, Transcript>, Error>
+) -> ::Result<LinkedHashMap<String, Transcript>>
 {
     match (transcripts, transcript_coords) {
         // nothing defined -> the gene doesn't have any known transcripts
@@ -841,7 +863,8 @@ fn resolve_transcripts_input(
             for (trx_id, (trx_coord, exon_coords, coding_coord)) in trxs_coords.into_iter() {
 
                 if trx_coord.0 < gene_interval.start || trx_coord.1 > gene_interval.end {
-                    return Err(Error::Feature(FeatureError::TranscriptNotFullyEnveloped));
+                    let tid = Some(trx_id);
+                    return Err(::Error::Feature(FeatureError::TranscriptNotFullyEnveloped(tid)));
                 }
 
                 let btrx = TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
@@ -875,14 +898,16 @@ fn infer_exons(
 ) -> Result<Vec<Exon>, FeatureError>
 {
 
+    let tid = transcript_id.map(|id| id.to_owned());
+
     if exon_coords.len() == 0 {
-        return Err(FeatureError::UnspecifiedExons);
+        return Err(FeatureError::UnspecifiedExons(tid));
     }
 
     let mut m_exon_coords = Vec::with_capacity(exon_coords.len());
     for &(a, b) in exon_coords.iter() {
         if a >= b {
-            return Err(FeatureError::InvalidExonInterval)
+            return Err(FeatureError::InvalidExonInterval(tid))
         }
         m_exon_coords.push((a, b));
     }
@@ -900,7 +925,7 @@ fn infer_exons(
     let exon_r = (m_exon_coords.first().unwrap().0, m_exon_coords.last().unwrap().1);
 
     if exon_r.0 != transcript_interval.start || exon_r.1 != transcript_interval.end {
-        return Err(FeatureError::UnmatchedExons);
+        return Err(FeatureError::UnmatchedExons(tid));
     }
 
     match adj_coding_coord {
@@ -908,11 +933,11 @@ fn infer_exons(
         Some(coding_r) => {
             // Improper coding region is an error
             if coding_r.0 >= coding_r.1 {
-                return Err(FeatureError::InvalidCodingInterval);
+                return Err(FeatureError::InvalidCodingInterval(tid));
             }
             // Coding coord must be fully enveloped by exon max-min
             if coding_r.0 < exon_r.0 || coding_r.1 > exon_r.1 {
-                return Err(FeatureError::CodingNotFullyEnveloped);
+                return Err(FeatureError::CodingNotFullyEnveloped(tid));
             }
             // Coding start and end must be in exons
             let cine = m_exon_coords.iter()
@@ -921,7 +946,7 @@ fn infer_exons(
                      acc.1 || (c.0 <= coding_r.1 && coding_r.1 <= c.1))
                 });
             if !cine.0 || !cine.1 {
-                return Err(FeatureError::CodingInIntron);
+                return Err(FeatureError::CodingInIntron(tid));
             }
             // There must be room for stop codons (which is not inclusive in coding_coord)
             let stop_codon_ok = match transcript_strand {
@@ -931,7 +956,7 @@ fn infer_exons(
                     coding_r.0 - 3 >= exon_r.0 && coding_r.1 + 3 <= exon_r.1,
             };
             if !stop_codon_ok {
-                return Err(FeatureError::CodingTooLarge);
+                return Err(FeatureError::CodingTooLarge(tid));
             }
             infer_exon_features(&m_exon_coords, coding_r, &transcript_seqname, transcript_strand,
                                 transcript_id, gene_id, exon_id)
@@ -947,7 +972,7 @@ fn infer_exons(
                         interval: Interval::new(start..end).unwrap(),
                         strand: *transcript_strand,
                         id: exon_id.map(|id| id.to_owned()),
-                        transcript_id: transcript_id.map(|id| id.to_owned()),
+                        transcript_id: tid.clone(),
                         gene_id: gene_id.map(|id| id.to_owned()),
                         attributes: MultiMap::new(),
                         features: Vec::new(),
@@ -1032,6 +1057,8 @@ fn infer_exon_features(
         }
     };
 
+    let tid = transcript_id.map(|id| id.to_owned());
+
     // how much we have consumed the 5' or 3' codon
     let (mut codon1_rem, mut codon2_rem) = (3, 3);
     for &(start, end) in exon_coords.iter() {
@@ -1087,7 +1114,7 @@ fn infer_exon_features(
             } else if end == coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // a coding region must have at least 3 bases for the start codon
-                    return Err(FeatureError::CodingTooSmall);
+                    return Err(FeatureError::CodingTooSmall(tid));
                 }
                 match transcript_strand {
                     &Strand::Forward => {
@@ -1120,7 +1147,7 @@ fn infer_exon_features(
             } else if end > coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::CodingTooSmall);
+                    return Err(FeatureError::CodingTooSmall(tid));
                 }
                 match transcript_strand {
                     &Strand::Forward => {
@@ -1186,7 +1213,7 @@ fn infer_exon_features(
             } else if end == coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::CodingTooSmall);
+                    return Err(FeatureError::CodingTooSmall(tid));
                 }
                 let mut exon = exn(start, end, vec![]);
                 match transcript_strand {
@@ -1211,7 +1238,7 @@ fn infer_exon_features(
             } else if end > coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::CodingTooSmall);
+                    return Err(FeatureError::CodingTooSmall(tid));
                 }
                 let mut exon = exn(start, end, vec![]);
                 match transcript_strand {

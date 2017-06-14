@@ -37,6 +37,7 @@ quick_error! {
     pub enum Error {
         Feature(err: FeatureError) {
             description(err.description())
+            display("{}", err)
             from()
             cause(err)
         }
@@ -45,6 +46,7 @@ quick_error! {
         }
         Gff(err: GffError) {
             description(err.description())
+            display("{}", err)
             from()
             cause(err)
         }
@@ -114,6 +116,9 @@ mod consts {
     // Commonly-used attribute keys.
     pub(crate) const GENE_ID_STR: &'static str = "gene_id";
     pub(crate) const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
+
+    // Value for optionally known strings.
+    pub(crate) const DEF_ID: &'static str = "<unknown>";
 }
 
 // Generic utilities

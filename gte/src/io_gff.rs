@@ -1,5 +1,6 @@
 use std::cmp::{max, min};
 use std::convert::AsRef;
+use std::error::Error;
 use std::io;
 use std::iter::Filter;
 use std::fs;
@@ -12,9 +13,10 @@ use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 use regex::Regex;
 
-use {Coord, Error, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript,
+use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript,
      RawTrxCoord};
 use consts::*;
+use utils::OptionDeref;
 
 
 quick_error! {
@@ -29,26 +31,38 @@ quick_error! {
         MultipleTranscriptIds {
             description("more than one 'transcript_id' found")
         }
-        StopCodonInCds {
+        StopCodonInCds(tid: Option<String>) {
             description("'stop_codon' feature intersects cds")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        MissingTranscript {
+        MissingTranscript(tid: Option<String>) {
             description("no 'transcript' feature present")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
         MultipleTranscripts {
             description("multiple 'transcript' features present")
         }
-        OrphanStop {
+        OrphanStop(tid: Option<String>) {
             description("stop codon exists without start codon")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        OrphanStart {
+        OrphanStart(tid: Option<String>) {
             description("start codon exists without stop codon")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        OrphanCodon {
+        OrphanCodon(tid: Option<String>) {
             description("start and stop codon exists without cds")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
-        OrphanCds {
+        OrphanCds(tid: Option<String>) {
             description("cds exists without start and/or stop codon")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
         UnsupportedGffType {
             description("unsupported gff type")
@@ -104,7 +118,7 @@ impl<R: io::Read> Reader<R> {
 
         let mut parts = Vec::new();
         for result in self.raw_rows_stream() {
-            let mut row = result.map_err(Error::from)?;
+            let mut row = result.map_err(::Error::from)?;
             if let Some(ref pre) = contig_prefix {
                 row.0 = format!("{}{}", pre, row.0);
             }
@@ -116,7 +130,7 @@ impl<R: io::Read> Reader<R> {
             match row.2.as_str() {
                 TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
                     let rf = TranscriptPart::try_from_row(row, &gid_regex, &tid_regex)
-                        .map_err(Error::from)?;
+                        .map_err(::Error::from)?;
                     parts.push(rf);
                 },
                 _ => {},
@@ -159,7 +173,7 @@ impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
-            .map(|row| row.map_err(Error::from))
+            .map(|row| row.map_err(::Error::from))
     }
 }
 
@@ -173,7 +187,7 @@ impl<'a, R> Iterator for GffRawRows<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
-            .map(|row| row.map_err(Error::from))
+            .map(|row| row.map_err(::Error::from))
     }
 }
 
@@ -280,7 +294,7 @@ impl<'a, R> Iterator for GffGenesStream<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_gene).next()
-            .map(|res| res.map_err(Error::from))
+            .map(|res| res.map_err(::Error::from))
     }
 }
 
@@ -379,7 +393,7 @@ impl<'a, R> Iterator for GffTranscriptsStream<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_transcript).next()
-            .map(|res| res.map_err(Error::from))
+            .map(|res| res.map_err(::Error::from))
     }
 }
 
@@ -474,7 +488,7 @@ impl Iterator for GffTranscripts {
                         if let None = trx_coord {
                             trx_coord = Some(rf.coord);
                         } else {
-                            let err = Error::Gff(GffError::MultipleTranscripts);
+                            let err = ::Error::Gff(GffError::MultipleTranscripts);
                             return Err(err);
                         }
                     },
@@ -495,12 +509,14 @@ impl Iterator for GffTranscripts {
                 }
             }
 
-            let (trx_start, trx_end) = trx_coord.ok_or(GffError::MissingTranscript)
-                .map_err(Error::from)?;
+            let (trx_start, trx_end) = trx_coord
+                .ok_or(GffError::MissingTranscript(Some(tid.clone())))
+                .map_err(::Error::from)?;
 
-            let coding_coord = resolve_coding(codon_5, codon_3, cds_coord, &strand,
-                                              self.loose_codons)
-                .map_err(Error::from)?;
+            let coding_coord =
+                resolve_coding(Some(tid.as_str()), codon_5, codon_3, cds_coord, &strand,
+                               self.loose_codons)
+                .map_err(::Error::from)?;
 
             TBuilder::new(chrom, trx_start, trx_end)
                 .id(tid)
@@ -516,6 +532,7 @@ impl Iterator for GffTranscripts {
 }
 
 fn resolve_coding(
+    tid: Option<&str>,
     codon_5: Option<u64>,
     codon_3: Option<u64>,
     cds_coord: Option<Coord<u64>>,
@@ -531,14 +548,16 @@ fn resolve_coding(
         // error case: only stop or start codon defined
         (a, b) => {
             if !loose_codons {
-                let start = a.ok_or(GffError::OrphanStop)?;
-                let end = b.ok_or(GffError::OrphanStart)?;
+                let start = a
+                    .ok_or(GffError::OrphanStop(tid.map(|v| v.to_owned())))?;
+                let end = b
+                    .ok_or(GffError::OrphanStart(tid.map(|v| v.to_owned())))?;
                 Some((start, end))
             } else {
                 let start = a.or(cds_coord.map(|c| c.0))
-                    .ok_or(GffError::OrphanCds)?;
+                    .ok_or(GffError::OrphanCds(tid.map(|v| v.to_owned())))?;
                 let end = b.or(cds_coord.map(|c| c.1))
-                    .ok_or(GffError::OrphanCds)?;
+                    .ok_or(GffError::OrphanCds(tid.map(|v| v.to_owned())))?;
                 Some((start, end))
             }
         }
@@ -546,13 +565,14 @@ fn resolve_coding(
 
     if !loose_codons {
         if let Some((start, end)) = coding_coord {
-            let cdsc = cds_coord.ok_or(GffError::OrphanCodon)?;
+            let cdsc = cds_coord
+                .ok_or(GffError::OrphanCodon(tid.map(|v| v.to_owned())))?;
             match strand {
                 &Strand::Forward if end == cdsc.1 => {
-                    return Err(GffError::StopCodonInCds);
+                    return Err(GffError::StopCodonInCds(tid.map(|v| v.to_owned())));
                 },
                 &Strand::Reverse if start > cdsc.0 => {
-                    return Err(GffError::StopCodonInCds);
+                    return Err(GffError::StopCodonInCds(tid.map(|v| v.to_owned())));
                 },
                 _ => {},
             }
@@ -566,13 +586,13 @@ fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> ::Result<Regex> {
     let fmts = match gff_type {
         GffType::GFF2 | GffType::GTF2 => Ok((" ", ";", r#"""#)),
         GffType::GFF3 => Ok(("=", ",", "")),
-        _ => Err(Error::from(GffError::UnsupportedGffType)),
+        _ => Err(::Error::from(GffError::UnsupportedGffType)),
     };
     fmts.and_then(|(delim, term, nest)| {
         let pat = format!(
             r#"{attr_name}{delim}{nest}(?P<value>[^{delim}{term}\t]+){nest}{term}?"#,
             attr_name=attr_name, delim=delim, term=term, nest=nest);
-        Regex::new(&pat).map_err(Error::from)
+        Regex::new(&pat).map_err(::Error::from)
     })
 
 }
@@ -587,7 +607,7 @@ impl Gene {
     }
 
     // TODO: also handle gene-level features
-    pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
+    pub fn into_gff_records(mut self) -> ::Result<Vec<gff::Record>> {
 
         let mut attribs = self.take_attributes();
 
@@ -627,7 +647,7 @@ impl Transcript {
     }
 
     // TODO: also handle transcript-level features
-    pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
+    pub fn into_gff_records(mut self) -> ::Result<Vec<gff::Record>> {
 
         let mut attribs = self.take_attributes();
 
@@ -680,7 +700,7 @@ impl EFK {
 
 impl Exon {
 
-    pub fn into_gff_records(mut self) -> Result<Vec<gff::Record>, Error> {
+    pub fn into_gff_records(mut self) -> ::Result<Vec<gff::Record>> {
 
         let mut attribs = self.take_attributes();
 
