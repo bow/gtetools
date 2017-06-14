@@ -4,13 +4,15 @@ use std::io;
 use std::iter::Filter;
 use std::fs;
 use std::path::Path;
+use std::vec;
 
 use bio::io::gff::{self, GffType};
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
+use regex::Regex;
 
-use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, Transcript, TBuilder, Error,
+use {Coord, Error, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript,
      RawTrxCoord};
 use consts::*;
 
@@ -19,10 +21,10 @@ quick_error! {
     #[derive(Debug)]
     pub enum GffError {
         MissingGeneId {
-            description("required 'gene_id' attribute not found")
+            description("gene identifier attribute not found")
         }
         MissingTranscriptId {
-            description("required 'transcript_id' attribute not found")
+            description("transcript identifier attribute not found")
         }
         MultipleTranscriptIds {
             description("more than one 'transcript_id' found")
@@ -44,6 +46,9 @@ quick_error! {
         }
         OrphanCds {
             description("cds exists without start and/or stop codon")
+        }
+        UnsupportedGffType {
+            description("unsupported gff type")
         }
     }
 }
@@ -76,6 +81,49 @@ impl<R: io::Read> Reader<R> {
                 .filter(GffTranscripts::<R>::transcript_filter_func as TrxFilterFunc)
                 .group_by(GffTranscripts::<R>::transcript_group_func),
         }
+    }
+
+    pub fn transcripts_mem<'a>(
+        &mut self,
+        gene_id_attr: &'a str,
+        transcript_id_attr: &'a str,
+        contig_prefix: Option<&'a str>,
+        contig_lstrip: Option<&'a str>,
+        strict_mode: bool,
+    ) -> Result<GffTranscriptsMem, Error> {
+
+        let gid_regex = make_gff_id_regex(gene_id_attr, self.gff_type)?;
+        let tid_regex = make_gff_id_regex(transcript_id_attr, self.gff_type)?;
+
+        let lstrip = contig_lstrip.map(|v| (v, v.len()));
+
+        let mut parts = Vec::new();
+        for result in self.raw_rows() {
+            if let Ok(mut row) = result {
+                if let Some(ref pre) = contig_prefix {
+                    row.0 = format!("{}{}", pre, row.0);
+                }
+                if let Some((ref lstr, lstr_len)) = lstrip {
+                    if row.0.starts_with(lstr) {
+                        let _ = row.0.drain(..lstr_len);
+                    }
+                }
+                match row.2.as_str() {
+                    TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
+                        let rf = TranscriptPart::try_from_row(row, &gid_regex, &tid_regex)
+                            .map_err(Error::from)?;
+                        parts.push(rf);
+                    },
+                    _ => {},
+                }
+            }
+        }
+        parts.sort_by_key(|ref elem| elem.sort_key());
+
+        Ok(GffTranscriptsMem {
+            groups: parts.into_iter().group_by(TranscriptPart::group_key),
+            strict_mode: strict_mode,
+        })
     }
 
     pub(crate) fn records(&mut self) -> GffRecords<R> {
@@ -329,6 +377,199 @@ impl<'a, R> Iterator for GffTranscripts<'a, R> where R: io::Read {
         self.inner.into_iter().map(Self::group_to_transcript).next()
             .map(|res| res.map_err(Error::from))
     }
+}
+
+
+#[derive(Debug, PartialEq)]
+struct TranscriptPart {
+    feature: String,
+    chrom: String,
+    coord: Coord<u64>,
+    strand: Strand,
+    transcript_id: String,
+    gene_id: String,
+}
+
+// sort key: gene identifier, transcript identifier, contig name, start, end, strand num
+type TPSortKey = (String, String, String, u64, u64, u8);
+
+// group key: gene identifier, transcript identifier, contig name, strand
+type TPGroupKey = (String, String, String, Strand);
+
+impl TranscriptPart {
+
+    fn try_from_row(
+        row: gff::RawRow,
+        gx_regex: &Regex,
+        trx_regex: &Regex,
+    ) -> Result<Self, GffError> {
+
+        let gx_id = gx_regex.captures(&row.8)
+            .and_then(|cap| cap.name("value"))
+            .map(|v| v.as_str().to_owned())
+            .ok_or(GffError::MissingGeneId)?;
+
+        let trx_id = trx_regex.captures(&row.8)
+            .and_then(|cap| cap.name("value"))
+            .map(|v| v.as_str().to_owned())
+            .ok_or(GffError::MissingTranscriptId)?;
+
+        Ok(TranscriptPart {
+            feature: row.2,
+            chrom: row.0,
+            coord: (row.3 - 1, row.4),
+            strand: Strand::from_char(&row.6).unwrap(),
+            transcript_id: trx_id,
+            gene_id: gx_id,
+        })
+    }
+
+    fn sort_key(&self) -> TPSortKey {
+        (self.gene_id.clone(), self.transcript_id.clone(),
+         self.chrom.clone(), self.coord.0, self.coord.1, self.strand_ord())
+    }
+
+    fn group_key(&self) -> TPGroupKey {
+        (self.gene_id.clone(), self.transcript_id.clone(), self.chrom.clone(), self.strand)
+    }
+
+    fn strand_ord(&self) -> u8 {
+        match &self.strand {
+            &Strand::Unknown => 0,
+            &Strand::Forward => 1,
+            &Strand::Reverse => 2,
+        }
+    }
+}
+
+pub struct GffTranscriptsMem {
+    groups: GroupBy<TPGroupKey, vec::IntoIter<TranscriptPart>, TPGroupFunc>,
+    strict_mode: bool,
+}
+
+type TPGroupFunc = fn(&TranscriptPart) -> TPGroupKey;
+
+type TPGroup<'a> = Group<'a, TPGroupKey, vec::IntoIter<TranscriptPart>, TPGroupFunc>;
+
+impl Iterator for GffTranscriptsMem {
+
+    type Item = Result<Transcript, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let group_to_transcript = |(key, rfs): (TPGroupKey, TPGroup)| {
+            let (gid, tid, chrom, strand) = key;
+            let mut exn_coords = Vec::new();
+            let mut trx_coord = None;
+            let mut cds_min = None;
+            let mut cds_max = None;
+            let mut startc_min = None;
+            let mut stopc_max = None;
+
+            for rf in rfs {
+                match rf.feature.as_str() {
+                    TRANSCRIPT_STR => {
+                        if let None = trx_coord {
+                            trx_coord = Some(rf.coord);
+                        } else {
+                            let err = Error::Gff(GffError::MultipleTranscripts);
+                            return Err(err);
+                        }
+                    },
+                    EXON_STR => {
+                        exn_coords.push(rf.coord);
+                    },
+                    CDS_STR => {
+                        cds_min = (cds_min).or(Some(INIT_START)).map(|c| min(c, rf.coord.0));
+                        cds_max = (cds_max).or(Some(INIT_END)).map(|c| max(c, rf.coord.1));
+                    },
+                    START_CODON_STR => {
+                        startc_min = (startc_min).or(Some(INIT_START)).map(|c| min(c, rf.coord.0))
+                    },
+                    STOP_CODON_STR => {
+                        stopc_max = (stopc_max).or(Some(INIT_END)).map(|c| max(c, rf.coord.1))
+                    },
+                    _ => {},
+                }
+            }
+
+            let (trx_start, trx_end) = trx_coord.ok_or(GffError::MissingTranscript)
+                .map_err(Error::from)?;
+
+            let coding_coord = resolve_coding(startc_min, stopc_max, cds_min, cds_max, &strand,
+                                              self.strict_mode)
+                .map_err(Error::from)?;
+
+            TBuilder::new(chrom, trx_start, trx_end)
+                .id(tid)
+                .gene_id(gid)
+                .strand(strand)
+                .coords(exn_coords, coding_coord)
+                .coding_incl_stop(true)
+                .build()
+        };
+
+        self.groups.into_iter().map(group_to_transcript).next()
+    }
+}
+
+fn resolve_coding(
+    startc_min: Option<u64>,
+    stopc_max: Option<u64>,
+    cds_min: Option<u64>,
+    cds_max: Option<u64>,
+    strand: &Strand,
+    strict_mode: bool,
+) -> Result<Option<Coord<u64>>, GffError>
+{
+    let coding_coord = match (startc_min, stopc_max) {
+        // common case: stop and start codon defined
+        (Some(c0), Some(c1)) => Some((min(c0, c1), max(c0, c1))),
+        // expected case: no stop and start codon defined
+        (None, None) => None,
+        // error case: only stop or start codon defined
+        (a, b) => {
+            if strict_mode {
+                let start = a.ok_or(GffError::OrphanStop)?;
+                let end = b.ok_or(GffError::OrphanStart)?;
+                Some((min(start, end), max(start, end)))
+            } else {
+                let start = a.or(cds_min)
+                    .ok_or(GffError::OrphanCds)?;
+                let end = b.or(cds_max)
+                    .ok_or(GffError::OrphanCds)?;
+                Some((min(start, end), max(start, end)))
+            }
+        }
+    };
+
+    if let Some((start, end)) = coding_coord {
+        match strand {
+            &Strand::Forward if end == cds_max.unwrap() => {
+                return Err(GffError::StopCodonInCds);
+            },
+            &Strand::Reverse if start > cds_min.unwrap() => {
+                return Err(GffError::StopCodonInCds);
+            },
+            _ => {},
+        }
+    }
+
+    Ok(coding_coord)
+}
+
+fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> Result<Regex, Error> {
+    let fmts = match gff_type {
+        GffType::GFF2 | GffType::GTF2 => Ok((" ", ";", r#"""#)),
+        GffType::GFF3 => Ok(("=", ",", "")),
+        _ => Err(Error::from(GffError::UnsupportedGffType)),
+    };
+    fmts.and_then(|(delim, term, nest)| {
+        let pat = format!(
+            r#"{attr_name}{delim}{nest}(?P<value>[^{delim}{term}\t]+){nest}{term}?"#,
+            attr_name=attr_name, delim=delim, term=term, nest=nest);
+        Regex::new(&pat).map_err(Error::from)
+    })
+
 }
 
 impl Gene {

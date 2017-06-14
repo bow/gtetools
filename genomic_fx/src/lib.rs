@@ -5,6 +5,7 @@ extern crate linked_hash_map;
 extern crate multimap;
 #[macro_use]
 extern crate quick_error;
+extern crate regex;
 
 use std::io::Error as StdIoError;
 use std::num::{ParseFloatError, ParseIntError};
@@ -13,6 +14,7 @@ pub use bio::utils::Strand;
 pub use bio::io::gff::GffType;
 use bio::io::gff;
 use csv::Error as CsvError;
+use regex::Error as RegexError;
 
 mod feature;
 pub use feature::{Feature, FeatureError, FeatureKind,
@@ -47,6 +49,11 @@ quick_error! {
             cause(err)
         }
         BioGff(err: gff::GffError) {
+            description(err.description())
+            from()
+            cause(err)
+        }
+        Regex(err: RegexError) {
             description(err.description())
             from()
             cause(err)
