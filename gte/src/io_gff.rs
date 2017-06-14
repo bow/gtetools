@@ -44,6 +44,9 @@ quick_error! {
         OrphanStart {
             description("start codon exists without stop codon")
         }
+        OrphanCodon {
+            description("start and stop codon exists without cds")
+        }
         OrphanCds {
             description("cds exists without start and/or stop codon")
         }
@@ -89,7 +92,7 @@ impl<R: io::Read> Reader<R> {
         transcript_id_attr: Option<&'a str>,
         contig_prefix: Option<&'a str>,
         contig_lstrip: Option<&'a str>,
-        strict_mode: bool,
+        loose_codons: bool,
     ) -> ::Result<GffTranscripts> {
 
         let gid_regex = make_gff_id_regex(
@@ -123,7 +126,7 @@ impl<R: io::Read> Reader<R> {
 
         Ok(GffTranscripts {
             groups: parts.into_iter().group_by(TranscriptPart::group_key),
-            strict_mode: strict_mode,
+            loose_codons: loose_codons,
         })
     }
 
@@ -445,7 +448,7 @@ impl TranscriptPart {
 
 pub struct GffTranscripts {
     groups: GroupBy<TPGroupKey, vec::IntoIter<TranscriptPart>, TPGroupFunc>,
-    strict_mode: bool,
+    loose_codons: bool,
 }
 
 type TPGroupFunc = fn(&TranscriptPart) -> TPGroupKey;
@@ -461,14 +464,13 @@ impl Iterator for GffTranscripts {
             let (gid, tid, chrom, strand) = key;
             let mut exn_coords = Vec::new();
             let mut trx_coord = None;
-            let mut cds_min = None;
-            let mut cds_max = None;
-            let mut startc_min = None;
-            let mut stopc_max = None;
+            let mut cds_coord = None;
+            let mut codon_5 = None;
+            let mut codon_3 = None;
 
             for rf in rfs {
-                match rf.feature.as_str() {
-                    TRANSCRIPT_STR => {
+                match (rf.feature.as_str(), strand) {
+                    (TRANSCRIPT_STR, _) => {
                         if let None = trx_coord {
                             trx_coord = Some(rf.coord);
                         } else {
@@ -476,18 +478,18 @@ impl Iterator for GffTranscripts {
                             return Err(err);
                         }
                     },
-                    EXON_STR => {
+                    (EXON_STR, _) => {
                         exn_coords.push(rf.coord);
                     },
-                    CDS_STR => {
-                        cds_min = (cds_min).or(Some(INIT_START)).map(|c| min(c, rf.coord.0));
-                        cds_max = (cds_max).or(Some(INIT_END)).map(|c| max(c, rf.coord.1));
+                    (CDS_STR, _) => {
+                        cds_coord = (cds_coord).or(Some(INIT_COORD))
+                            .map(|(a, b)| (min(a, rf.coord.0), max(b, rf.coord.1)));
                     },
-                    START_CODON_STR => {
-                        startc_min = (startc_min).or(Some(INIT_START)).map(|c| min(c, rf.coord.0))
+                    (START_CODON_STR, Strand::Forward) | (STOP_CODON_STR, Strand::Reverse) => {
+                        codon_5 = (codon_5).or(Some(INIT_START)).map(|c| min(c, rf.coord.0))
                     },
-                    STOP_CODON_STR => {
-                        stopc_max = (stopc_max).or(Some(INIT_END)).map(|c| max(c, rf.coord.1))
+                    (STOP_CODON_STR, Strand::Forward) | (START_CODON_STR, Strand::Reverse) => {
+                        codon_3 = (codon_3).or(Some(INIT_END)).map(|c| max(c, rf.coord.1))
                     },
                     _ => {},
                 }
@@ -496,8 +498,8 @@ impl Iterator for GffTranscripts {
             let (trx_start, trx_end) = trx_coord.ok_or(GffError::MissingTranscript)
                 .map_err(Error::from)?;
 
-            let coding_coord = resolve_coding(startc_min, stopc_max, cds_min, cds_max, &strand,
-                                              self.strict_mode)
+            let coding_coord = resolve_coding(codon_5, codon_3, cds_coord, &strand,
+                                              self.loose_codons)
                 .map_err(Error::from)?;
 
             TBuilder::new(chrom, trx_start, trx_end)
@@ -514,44 +516,46 @@ impl Iterator for GffTranscripts {
 }
 
 fn resolve_coding(
-    startc_min: Option<u64>,
-    stopc_max: Option<u64>,
-    cds_min: Option<u64>,
-    cds_max: Option<u64>,
+    codon_5: Option<u64>,
+    codon_3: Option<u64>,
+    cds_coord: Option<Coord<u64>>,
     strand: &Strand,
-    strict_mode: bool,
+    loose_codons: bool,
 ) -> Result<Option<Coord<u64>>, GffError>
 {
-    let coding_coord = match (startc_min, stopc_max) {
+    let coding_coord = match (codon_5, codon_3) {
         // common case: stop and start codon defined
-        (Some(c0), Some(c1)) => Some((min(c0, c1), max(c0, c1))),
+        (Some(c5), Some(c3)) => Some((c5, c3)),
         // expected case: no stop and start codon defined
         (None, None) => None,
         // error case: only stop or start codon defined
         (a, b) => {
-            if strict_mode {
+            if !loose_codons {
                 let start = a.ok_or(GffError::OrphanStop)?;
                 let end = b.ok_or(GffError::OrphanStart)?;
-                Some((min(start, end), max(start, end)))
+                Some((start, end))
             } else {
-                let start = a.or(cds_min)
+                let start = a.or(cds_coord.map(|c| c.0))
                     .ok_or(GffError::OrphanCds)?;
-                let end = b.or(cds_max)
+                let end = b.or(cds_coord.map(|c| c.1))
                     .ok_or(GffError::OrphanCds)?;
-                Some((min(start, end), max(start, end)))
+                Some((start, end))
             }
         }
     };
 
-    if let Some((start, end)) = coding_coord {
-        match strand {
-            &Strand::Forward if end == cds_max.unwrap() => {
-                return Err(GffError::StopCodonInCds);
-            },
-            &Strand::Reverse if start > cds_min.unwrap() => {
-                return Err(GffError::StopCodonInCds);
-            },
-            _ => {},
+    if !loose_codons {
+        if let Some((start, end)) = coding_coord {
+            let cdsc = cds_coord.ok_or(GffError::OrphanCodon)?;
+            match strand {
+                &Strand::Forward if end == cdsc.1 => {
+                    return Err(GffError::StopCodonInCds);
+                },
+                &Strand::Reverse if start > cdsc.0 => {
+                    return Err(GffError::StopCodonInCds);
+                },
+                _ => {},
+            }
         }
     }
 
