@@ -163,7 +163,7 @@ SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,
         b.iter(|| {
             let mut count = 0;
             let mut reader = RefFlatReader::from_reader(REFFLAT_MULT_ROWS);
-            for rec in reader.records() {
+            for rec in reader.records_stream() {
                 if let Ok(_) = rec {
                     count += 1;
                 }
@@ -177,7 +177,7 @@ SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,
         b.iter(|| {
             let mut count = 0;
             let mut reader = RefFlatReader::from_reader(REFFLAT_MULT_ROWS);
-            for trx in reader.transcripts() {
+            for trx in reader.transcripts_stream() {
                 if let Ok(_) = trx {
                     count += 1;
                 }
@@ -191,7 +191,7 @@ SMIM12\tNM_138428\tchr1\t-\t34850361\t34859816\t34855698\t34855977\t2\t34850361,
         b.iter(|| {
             let mut count = 0;
             let mut reader = RefFlatReader::from_reader(REFFLAT_MULT_ROWS);
-            for gx in reader.genes() {
+            for gx in reader.genes_stream() {
                 if let Ok(_) = gx {
                     count += 1;
                 }

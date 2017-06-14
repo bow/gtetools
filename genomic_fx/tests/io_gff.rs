@@ -4,7 +4,7 @@ extern crate genomic_fx;
 use std::io;
 
 use genomic_fx::{GffType, GffReader,
-                 GffGenes, GffTranscripts,
+                 GffGenesStream, GffTranscriptsStream,
                  Gene, Transcript, ExonFeatureKind as EFK, Strand};
 use Strand::*;
 
@@ -12,14 +12,14 @@ use Strand::*;
 static SINGLE_GENE_GTF: &'static str = include_str!("data/single_gene.gtf");
 
 
-fn next_gx<R>(rg: &mut GffGenes<R>) -> Gene where R: io::Read {
+fn next_gx<R>(rg: &mut GffGenesStream<R>) -> Gene where R: io::Read {
     rg.next().expect("a gene result").expect("a gene")
 }
 
 #[test]
 fn gtf_reader_single_gene() {
     let mut reader = GffReader::from_reader(SINGLE_GENE_GTF.as_bytes(), GffType::GTF2);
-    let mut genes = reader.genes();
+    let mut genes = reader.genes_stream();
 
     let gx = next_gx(&mut genes);
     assert_eq!(gx.seq_name(), "chr2");
@@ -65,14 +65,14 @@ fn gtf_reader_single_gene() {
     assert!(genes.next().is_none());
 }
 
-fn next_trx<R>(rt: &mut GffTranscripts<R>) -> Transcript where R: io::Read {
+fn next_trx<R>(rt: &mut GffTranscriptsStream<R>) -> Transcript where R: io::Read {
     rt.next().expect("a transcript result").expect("a transcript")
 }
 
 #[test]
-fn gtf_reader_multiple_transcripts() {
+fn gtf_reader_multiple_transcripts_stream() {
     let mut reader = GffReader::from_reader(SINGLE_GENE_GTF.as_bytes(), GffType::GTF2);
-    let mut transcripts = reader.transcripts();
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.seq_name(), "chr2");

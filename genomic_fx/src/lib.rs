@@ -25,11 +25,11 @@ pub use feature::{Feature, FeatureError, FeatureKind,
 mod io_refflat;
 pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
                      RefFlatRow, RefFlatRecord,
-                     RefFlatRecords, RefFlatTranscripts, RefFlatGenes};
+                     RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream};
 
 mod io_gff;
 pub use io_gff::{Reader as GffReader,
-                 GffError, GffGenes, GffTranscripts};
+                 GffError, GffGenesStream, GffTranscriptsStream, GffTranscripts};
 
 
 quick_error! {

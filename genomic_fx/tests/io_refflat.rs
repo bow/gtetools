@@ -7,7 +7,7 @@ use std::io;
 use linked_hash_map::LinkedHashMap;
 
 use genomic_fx::{RefFlatReader, RefFlatWriter, RefFlatRecord,
-                 RefFlatRecords, RefFlatTranscripts, RefFlatGenes,
+                 RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream,
                  Transcript, TBuilder, Gene, GBuilder, Strand};
 
 
@@ -17,22 +17,22 @@ static MULT_ROWS_MULT_GENES_WITH_CDS: &'static str =
     include_str!("data/mult_rows_mult_genes_with_cds.refFlat");
 
 
-fn next_rec<'a, R>(rr: &mut RefFlatRecords<'a, R>) -> RefFlatRecord where R: io::Read {
+fn next_rec<'a, R>(rr: &mut RefFlatRecordsStream<'a, R>) -> RefFlatRecord where R: io::Read {
     rr.next().expect("a refflat record result").expect("a refflat record")
 }
 
-fn next_trx<'a, R>(rt: &mut RefFlatTranscripts<'a, R>) -> Transcript where R: io::Read {
+fn next_trx<'a, R>(rt: &mut RefFlatTranscriptsStream<'a, R>) -> Transcript where R: io::Read {
     rt.next().expect("a transcript result").expect("a transcript")
 }
 
-fn next_gx<'a, R>(rg: &mut RefFlatGenes<'a, R>) -> Gene where R: io::Read {
+fn next_gx<'a, R>(rg: &mut RefFlatGenesStream<'a, R>) -> Gene where R: io::Read {
     rg.next().expect("a gene result").expect("a gene")
 }
 
 #[test]
 fn refflat_reader_records_single_row_no_cds() {
     let mut reader = RefFlatReader::from_reader(SINGLE_ROW_NO_CDS.as_bytes());
-    let mut records = reader.records();
+    let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
     assert_eq!(rec1.gene_id, "DDX11L1".to_owned());
@@ -43,7 +43,7 @@ fn refflat_reader_records_single_row_no_cds() {
 #[test]
 fn refflat_reader_transcripts_single_row_no_cds() {
     let mut reader = RefFlatReader::from_reader(SINGLE_ROW_NO_CDS.as_bytes());
-    let mut transcripts = reader.transcripts();
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.id(), Some("NR_046018"));
@@ -54,7 +54,7 @@ fn refflat_reader_transcripts_single_row_no_cds() {
 #[test]
 fn refflat_reader_genes_single_row_no_cds() {
     let mut reader = RefFlatReader::from_reader(SINGLE_ROW_NO_CDS.as_bytes());
-    let mut genes = reader.genes();
+    let mut genes = reader.genes_stream();
 
     let gx1 = next_gx(&mut genes);
     assert_eq!(gx1.id(), Some("DDX11L1"));
@@ -65,7 +65,7 @@ fn refflat_reader_genes_single_row_no_cds() {
 #[test]
 fn refflat_reader_records_mult_rows_no_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_NO_CDS.as_bytes());
-    let mut records = reader.records();
+    let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
     assert_eq!(rec1.gene_id, "DDX11L1".to_owned());
@@ -79,7 +79,7 @@ fn refflat_reader_records_mult_rows_no_cds() {
 #[test]
 fn refflat_reader_transcripts_mult_rows_no_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_NO_CDS.as_bytes());
-    let mut transcripts = reader.transcripts();
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.id(), Some("NR_046018"));
@@ -93,7 +93,7 @@ fn refflat_reader_transcripts_mult_rows_no_cds() {
 #[test]
 fn refflat_reader_genes_mult_rows_no_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_NO_CDS.as_bytes());
-    let mut genes = reader.genes();
+    let mut genes = reader.genes_stream();
 
     let gx1 = next_gx(&mut genes);
     assert_eq!(gx1.id(), Some("DDX11L1"));
@@ -107,7 +107,7 @@ fn refflat_reader_genes_mult_rows_no_cds() {
 #[test]
 fn refflat_reader_records_mult_rows_mult_genes_with_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_MULT_GENES_WITH_CDS.as_bytes());
-    let mut records = reader.records();
+    let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
     assert_eq!(rec1.transcript_name, "NM_001297605".to_owned());
@@ -125,7 +125,7 @@ fn refflat_reader_records_mult_rows_mult_genes_with_cds() {
 #[test]
 fn refflat_reader_transcripts_mult_rows_mult_genes_with_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_MULT_GENES_WITH_CDS.as_bytes());
-    let mut transcripts = reader.transcripts();
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.id(), Some("NM_001297605"));
@@ -143,7 +143,7 @@ fn refflat_reader_transcripts_mult_rows_mult_genes_with_cds() {
 #[test]
 fn refflat_reader_genes_mult_rows_mult_genes_with_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_MULT_GENES_WITH_CDS.as_bytes());
-    let mut genes = reader.genes();
+    let mut genes = reader.genes_stream();
 
     let gx1 = next_gx(&mut genes);
     assert_eq!(gx1.id(), Some("TNFRSF14"));

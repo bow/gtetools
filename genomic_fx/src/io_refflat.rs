@@ -120,21 +120,21 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    pub fn records<'a>(&'a mut self) -> RefFlatRecords<'a, R> {
-        RefFlatRecords {
+    pub fn records_stream<'a>(&'a mut self) -> RefFlatRecordsStream<'a, R> {
+        RefFlatRecordsStream {
             inner: self.inner.decode()
         }
     }
 
-    pub fn transcripts<'a>(&'a mut self) -> RefFlatTranscripts<'a, R> {
-        RefFlatTranscripts {
-            inner: self.records()
+    pub fn transcripts_stream<'a>(&'a mut self) -> RefFlatTranscriptsStream<'a, R> {
+        RefFlatTranscriptsStream {
+            inner: self.records_stream()
         }
     }
 
-    pub fn genes<'a>(&'a mut self) -> RefFlatGenes<'a, R> {
-        RefFlatGenes {
-            inner: self.records().group_by(RefFlatGenes::<'a, R>::group_func),
+    pub fn genes_stream<'a>(&'a mut self) -> RefFlatGenesStream<'a, R> {
+        RefFlatGenesStream {
+            inner: self.records_stream().group_by(RefFlatGenesStream::<'a, R>::group_func),
         }
     }
 }
@@ -145,11 +145,11 @@ impl Reader<fs::File> {
     }
 }
 
-pub struct RefFlatRecords<'a, R: 'a> where R: io::Read {
+pub struct RefFlatRecordsStream<'a, R: 'a> where R: io::Read {
     inner: csv::DecodedRecords<'a, R, RefFlatRow>,
 }
 
-impl<'a, R> Iterator for RefFlatRecords<'a, R> where R: io::Read {
+impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
 
     type Item = Result<RefFlatRecord, Error>;
 
@@ -162,11 +162,11 @@ impl<'a, R> Iterator for RefFlatRecords<'a, R> where R: io::Read {
     }
 }
 
-pub struct RefFlatTranscripts<'a, R: 'a> where R: io::Read {
-    inner: RefFlatRecords<'a, R>,
+pub struct RefFlatTranscriptsStream<'a, R: 'a> where R: io::Read {
+    inner: RefFlatRecordsStream<'a, R>,
 }
 
-impl<'a, R> Iterator for RefFlatTranscripts<'a, R> where R: io::Read {
+impl<'a, R> Iterator for RefFlatTranscriptsStream<'a, R> where R: io::Read {
 
     type Item = Result<Transcript, Error>;
 
@@ -180,13 +180,13 @@ type GroupKey = Option<(String, String, char)>;
 
 type GroupFunc = fn(&Result<RefFlatRecord, Error>) -> GroupKey;
 
-type GroupedRecords<'a, 'b, R> = Group<'b, GroupKey, RefFlatRecords<'a, R>, GroupFunc>;
+type GroupedRecords<'a, 'b, R> = Group<'b, GroupKey, RefFlatRecordsStream<'a, R>, GroupFunc>;
 
-pub struct RefFlatGenes<'a, R: 'a> where R: io::Read, {
-    inner: GroupBy<GroupKey, RefFlatRecords<'a, R>, GroupFunc>,
+pub struct RefFlatGenesStream<'a, R: 'a> where R: io::Read, {
+    inner: GroupBy<GroupKey, RefFlatRecordsStream<'a, R>, GroupFunc>,
 }
 
-impl<'a, R> RefFlatGenes<'a, R> where R: io::Read {
+impl<'a, R> RefFlatGenesStream<'a, R> where R: io::Read {
 
     fn group_func(result: &Result<RefFlatRecord, Error>) -> GroupKey {
         result.as_ref().ok()
@@ -221,7 +221,7 @@ impl<'a, R> RefFlatGenes<'a, R> where R: io::Read {
     }
 }
 
-impl<'a, R> Iterator for RefFlatGenes<'a, R> where R: io::Read {
+impl<'a, R> Iterator for RefFlatGenesStream<'a, R> where R: io::Read {
 
     type Item = Result<Gene, Error>;
 
