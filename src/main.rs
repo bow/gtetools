@@ -14,13 +14,12 @@ const TEMPLATE: &'static str = "
 {about}
 
 
-USAGE:
-    {usage}
+Usage: {usage}
 
-SUBCOMMANDS:
+Subcommands:
 {subcommands}
 
-OPTIONS:
+Options:
 {unified}";
 
 const ABOUT: &'static str = "

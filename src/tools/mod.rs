@@ -4,11 +4,10 @@ pub mod stats;
 pub mod gff_to_refflat;
 
 const TEMPLATE_SUBCMD: &'static str = "
-USAGE:
-    {usage}
+Usage: {usage}
 
-ARGS:
+Arguments:
 {positionals}
 
-OPTIONS:
+Options:
 {unified}";
