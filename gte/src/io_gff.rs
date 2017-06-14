@@ -90,7 +90,7 @@ impl<R: io::Read> Reader<R> {
         contig_prefix: Option<&'a str>,
         contig_lstrip: Option<&'a str>,
         strict_mode: bool,
-    ) -> Result<GffTranscripts, Error> {
+    ) -> ::Result<GffTranscripts> {
 
         let gid_regex = make_gff_id_regex(gene_id_attr, self.gff_type)?;
         let tid_regex = make_gff_id_regex(transcript_id_attr, self.gff_type)?;
@@ -150,9 +150,9 @@ pub(crate) struct GffRecords<'a, R: 'a> where R: io::Read {
 
 impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
 
-    type Item = Result<gff::Record, Error>;
+    type Item = ::Result<gff::Record>;
 
-    fn next(&mut self) -> Option<Result<gff::Record, Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
             .map(|row| row.map_err(Error::from))
     }
@@ -164,9 +164,9 @@ pub(crate) struct GffRawRows<'a, R: 'a> where R: io::Read {
 
 impl<'a, R> Iterator for GffRawRows<'a, R> where R: io::Read {
 
-    type Item = Result<gff::RawRow, Error>;
+    type Item = ::Result<gff::RawRow>;
 
-    fn next(&mut self) -> Option<Result<gff::RawRow, Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
             .map(|row| row.map_err(Error::from))
     }
@@ -176,26 +176,26 @@ pub struct GffGenesStream<'a, R: 'a> where R: io::Read, {
     inner: GroupBy<GxGroupKey, GxRecords<'a, R>, GxGroupFunc>,
 }
 
-type GxFilterFunc = fn(&Result<gff::Record, Error>) -> bool;
+type GxFilterFunc = fn(&::Result<gff::Record>) -> bool;
 
 type GxRecords<'a, R> = Filter<GffRecords<'a, R>, GxFilterFunc>;
 
 type GxGroupKey = Option<(String, String, Strand)>;
 
-type GxGroupFunc = fn(&Result<gff::Record, Error>) -> GxGroupKey;
+type GxGroupFunc = fn(&::Result<gff::Record>) -> GxGroupKey;
 
 type GxGroupedRecs<'a, 'b, R> = Group<'b, GxGroupKey, GxRecords<'a, R>, GxGroupFunc>;
 
 impl<'a, R> GffGenesStream<'a, R> where R: io::Read {
 
-    fn gene_filter_func(result: &Result<gff::Record, Error>) -> bool {
+    fn gene_filter_func(result: &::Result<gff::Record>) -> bool {
         match result {
             &Ok(ref rec) => rec.attributes().contains_key(GENE_ID_STR),
             &Err(_) => true,  // Err(_) is supposed to be handled elsewhere
         }
     }
 
-    fn gene_group_func(result: &Result<gff::Record, Error>) -> GxGroupKey {
+    fn gene_group_func(result: &::Result<gff::Record>) -> GxGroupKey {
         result.as_ref().ok()
             .map(|res| {
                 let gene_id = res.attributes().get(GENE_ID_STR)
@@ -208,7 +208,7 @@ impl<'a, R> GffGenesStream<'a, R> where R: io::Read {
             })
     }
 
-    fn group_to_gene<'b>(group: (GxGroupKey, GxGroupedRecs<'a, 'b, R>)) -> Result<Gene, Error> {
+    fn group_to_gene<'b>(group: (GxGroupKey, GxGroupedRecs<'a, 'b, R>)) -> ::Result<Gene> {
         let (group_key, records) = group;
         match group_key {
 
@@ -271,7 +271,7 @@ impl<'a, R> GffGenesStream<'a, R> where R: io::Read {
 
 impl<'a, R> Iterator for GffGenesStream<'a, R> where R: io::Read {
 
-    type Item = Result<Gene, Error>;
+    type Item = ::Result<Gene>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_gene).next()
@@ -283,19 +283,19 @@ pub struct GffTranscriptsStream<'a, R: 'a> where R: io::Read {
     inner: GroupBy<TrxGroupKey, TrxRecords<'a, R>, TrxGroupFunc>,
 }
 
-type TrxFilterFunc = fn(&Result<gff::Record, Error>) -> bool;
+type TrxFilterFunc = fn(&::Result<gff::Record>) -> bool;
 
 type TrxRecords<'a, R> = Filter<GffRecords<'a, R>, TrxFilterFunc>;
 
 type TrxGroupKey = Option<(String, String, String, Strand)>;
 
-type TrxGroupFunc = fn(&Result<gff::Record, Error>) -> TrxGroupKey;
+type TrxGroupFunc = fn(&::Result<gff::Record>) -> TrxGroupKey;
 
 type TrxGroupedRecs<'a, 'b, R> = Group<'b, TrxGroupKey, TrxRecords<'a, R>, TrxGroupFunc>;
 
 impl<'a, R> GffTranscriptsStream<'a, R> where R: io::Read {
 
-    fn transcript_filter_func(result: &Result<gff::Record, Error>) -> bool {
+    fn transcript_filter_func(result: &::Result<gff::Record>) -> bool {
         match result {
             &Ok(ref rec) =>
                 rec.attributes().contains_key(GENE_ID_STR) &&
@@ -304,7 +304,7 @@ impl<'a, R> GffTranscriptsStream<'a, R> where R: io::Read {
         }
     }
 
-    fn transcript_group_func(result: &Result<gff::Record, Error>) -> TrxGroupKey {
+    fn transcript_group_func(result: &::Result<gff::Record>) -> TrxGroupKey {
         result.as_ref().ok()
             .map(|res| {
                 let gene_id = res.attributes().get(GENE_ID_STR)
@@ -321,7 +321,7 @@ impl<'a, R> GffTranscriptsStream<'a, R> where R: io::Read {
     }
 
     fn group_to_transcript<'b>(group: (TrxGroupKey, TrxGroupedRecs<'a, 'b, R>)
-    ) -> Result<Transcript, Error>
+    ) -> ::Result<Transcript>
     {
         let (group_key, records) = group;
         match group_key {
@@ -370,7 +370,7 @@ impl<'a, R> GffTranscriptsStream<'a, R> where R: io::Read {
 
 impl<'a, R> Iterator for GffTranscriptsStream<'a, R> where R: io::Read {
 
-    type Item = Result<Transcript, Error>;
+    type Item = ::Result<Transcript>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_transcript).next()
@@ -452,7 +452,7 @@ type TPGroup<'a> = Group<'a, TPGroupKey, vec::IntoIter<TranscriptPart>, TPGroupF
 
 impl Iterator for GffTranscripts {
 
-    type Item = Result<Transcript, Error>;
+    type Item = ::Result<Transcript>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let group_to_transcript = |(key, rfs): (TPGroupKey, TPGroup)| {
@@ -556,7 +556,7 @@ fn resolve_coding(
     Ok(coding_coord)
 }
 
-fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> Result<Regex, Error> {
+fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> ::Result<Regex> {
     let fmts = match gff_type {
         GffType::GFF2 | GffType::GTF2 => Ok((" ", ";", r#"""#)),
         GffType::GFF3 => Ok(("=", ",", "")),

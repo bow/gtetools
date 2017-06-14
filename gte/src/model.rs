@@ -295,7 +295,7 @@ impl EBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Exon, Error> {
+    pub fn build(self) -> ::Result<Exon> {
         let interval = coord_to_interval(self.start, self.end)
             .map_err(Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
@@ -554,7 +554,7 @@ impl TBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Transcript, Error> {
+    pub fn build(self) -> ::Result<Transcript> {
         let interval = coord_to_interval(self.start, self.end)
             .map_err(Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
@@ -686,7 +686,7 @@ impl GBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Gene, Error> {
+    pub fn build(self) -> ::Result<Gene> {
         let interval = coord_to_interval(self.start, self.end)
             .map_err(Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)

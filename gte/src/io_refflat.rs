@@ -40,7 +40,7 @@ pub struct RefFlatRecord {
 
 impl RefFlatRecord {
 
-    pub fn into_transcript(self) -> Result<Transcript, Error> {
+    pub fn into_transcript(self) -> ::Result<Transcript> {
 
         let exon_coords = self.zip_raw_exon_coords()?;
         if exon_coords.len() != self.num_exons {
@@ -150,9 +150,9 @@ pub struct RefFlatRecordsStream<'a, R: 'a> where R: io::Read {
 
 impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
 
-    type Item = Result<RefFlatRecord, Error>;
+    type Item = ::Result<RefFlatRecord>;
 
-    fn next(&mut self) -> Option<Result<RefFlatRecord, Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
             .map(|row| {
                 row.or_else(|err| Err(Error::from(err)))
@@ -167,9 +167,9 @@ pub struct RefFlatTranscriptsStream<'a, R: 'a> where R: io::Read {
 
 impl<'a, R> Iterator for RefFlatTranscriptsStream<'a, R> where R: io::Read {
 
-    type Item = Result<Transcript, Error>;
+    type Item = ::Result<Transcript>;
 
-    fn next(&mut self) -> Option<Result<Transcript, Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
             .map(|record| record.and_then(|rec| rec.into_transcript()))
     }
@@ -177,7 +177,7 @@ impl<'a, R> Iterator for RefFlatTranscriptsStream<'a, R> where R: io::Read {
 
 type GroupKey = Option<(String, String, char)>;
 
-type GroupFunc = fn(&Result<RefFlatRecord, Error>) -> GroupKey;
+type GroupFunc = fn(&::Result<RefFlatRecord>) -> GroupKey;
 
 type GroupedRecords<'a, 'b, R> = Group<'b, GroupKey, RefFlatRecordsStream<'a, R>, GroupFunc>;
 
@@ -187,12 +187,12 @@ pub struct RefFlatGenesStream<'a, R: 'a> where R: io::Read, {
 
 impl<'a, R> RefFlatGenesStream<'a, R> where R: io::Read {
 
-    fn group_func(result: &Result<RefFlatRecord, Error>) -> GroupKey {
+    fn group_func(result: &::Result<RefFlatRecord>) -> GroupKey {
         result.as_ref().ok()
             .map(|ref res| (res.gene_id.clone(), res.seq_name.clone(), res.strand.clone()))
     }
 
-    fn group_to_gene<'b>(group: (GroupKey, GroupedRecords<'a, 'b, R>)) -> Result<Gene, Error> {
+    fn group_to_gene<'b>(group: (GroupKey, GroupedRecords<'a, 'b, R>)) -> ::Result<Gene> {
         let (group_key, records) = group;
         match group_key {
 
@@ -222,9 +222,9 @@ impl<'a, R> RefFlatGenesStream<'a, R> where R: io::Read {
 
 impl<'a, R> Iterator for RefFlatGenesStream<'a, R> where R: io::Read {
 
-    type Item = Result<Gene, Error>;
+    type Item = ::Result<Gene>;
 
-    fn next(&mut self) -> Option<Result<Gene, Error>> {
+    fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_gene).next()
     }
 }
@@ -243,14 +243,14 @@ impl<W: io::Write> Writer<W> {
         }
     }
 
-    pub fn write(&mut self, row: &RefFlatRow) -> Result<(), Error> {
+    pub fn write(&mut self, row: &RefFlatRow) -> ::Result<()> {
         self.inner
             .encode((&row.0, &row.1, &row.2, row.3, row.4, row.5, row.6, row.7, row.8,
                      &row.9, &row.10))
             .map_err(Error::from)
     }
 
-    pub fn write_record(&mut self, record: &RefFlatRecord) -> Result<(), Error> {
+    pub fn write_record(&mut self, record: &RefFlatRecord) -> ::Result<()> {
         self.inner
             .encode((&record.gene_id, &record.transcript_name, &record.seq_name,
                      record.strand, record.trx_start, record.trx_end,
@@ -259,7 +259,7 @@ impl<W: io::Write> Writer<W> {
             .map_err(Error::from)
     }
 
-    pub fn write_transcript(&mut self, transcript: &Transcript) -> Result<(), Error> {
+    pub fn write_transcript(&mut self, transcript: &Transcript) -> ::Result<()> {
         let transcript_name = transcript.id()
             .map(|tn| tn.as_ref()).unwrap_or("");
         let strand_char = match transcript.strand() {
@@ -280,7 +280,7 @@ impl<W: io::Write> Writer<W> {
             .map_err(Error::from)
     }
 
-    pub fn write_gene(&mut self, gene: &Gene) -> Result<(), Error> {
+    pub fn write_gene(&mut self, gene: &Gene) -> ::Result<()> {
         for transcript in gene.transcripts().values() {
             self.write_transcript(&transcript)?;
         }
@@ -302,7 +302,7 @@ impl Transcript {
 
 impl Writer<fs::File> {
 
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> ::Result<Self> {
         let f = fs::File::create(path).map_err(Error::from)?;
         Ok(Writer::from_writer(f))
     }

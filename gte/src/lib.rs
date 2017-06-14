@@ -81,6 +81,8 @@ quick_error! {
     }
 }
 
+pub type Result<T> = ::std::result::Result<T, Error>;
+
 // Helper type for raw coordinates
 type Coord<T> = (T, T);
 
