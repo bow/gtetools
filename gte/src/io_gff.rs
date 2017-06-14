@@ -85,15 +85,17 @@ impl<R: io::Read> Reader<R> {
 
     pub fn transcripts<'a>(
         &mut self,
-        gene_id_attr: &'a str,
-        transcript_id_attr: &'a str,
+        gene_id_attr: Option<&'a str>,
+        transcript_id_attr: Option<&'a str>,
         contig_prefix: Option<&'a str>,
         contig_lstrip: Option<&'a str>,
         strict_mode: bool,
     ) -> ::Result<GffTranscripts> {
 
-        let gid_regex = make_gff_id_regex(gene_id_attr, self.gff_type)?;
-        let tid_regex = make_gff_id_regex(transcript_id_attr, self.gff_type)?;
+        let gid_regex = make_gff_id_regex(
+            gene_id_attr.unwrap_or(GENE_ID_STR), self.gff_type)?;
+        let tid_regex = make_gff_id_regex(
+            transcript_id_attr.unwrap_or(TRANSCRIPT_ID_STR), self.gff_type)?;
 
         let lstrip = contig_lstrip.map(|v| (v, v.len()));
 
