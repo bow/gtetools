@@ -2,6 +2,12 @@
 name = "gtetools"
 version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
+description = "Command line utilities for processing genes, transcripts, and exons"
+repository = "https://github.com/bow/gtetools"
+readme = "README.md"
+keywords = ["gene", "transcript", "exon", "gff", "refflat"]
+license = "BSD-3-Clause"
+categories = ["science", "parser-implementations", "command-line-utilities"]
 
 [dependencies]
 gte = { path = "gte", "version" = "~0.1.0" }
@@ -17,3 +23,6 @@ path = "src/main.rs"
 
 [workspace]
 members = ["gte"]
+
+[badges]
+travis-ci = { repository = "bow/gtetools" }

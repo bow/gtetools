@@ -2,9 +2,15 @@
 name = "gte"
 version = "0.1.0"
 authors = ["Wibowo Arindrarto <bow@bow.web.id>"]
+description = "Library for parsing and processing genes, transcripts, and exons"
+repository = "https://github.com/bow/gtetools"
+readme = "README.md"
+keywords = ["gene", "transcript", "exon", "gff", "refflat"]
+license = "BSD-3-Clause"
+categories = ["science", "parser-implementations"]
 
 [dependencies]
-bio = { git = "https://github.com/bow/rust-bio.git", branch = "sf/gff-structs" }
+bio = { git = "https://github.com/bow/rust-bio.git", rev = "00b5152" }
 csv = "~0.15"
 itertools = "~0.6"
 linked-hash-map = "~0.4"
@@ -14,3 +20,6 @@ regex = "~0.2"
 
 [dev-dependencies]
 matches = "~0.1.4"
+
+[badges]
+travis-ci = { repository = "bow/gtetools" }
