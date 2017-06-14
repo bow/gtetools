@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
 use clap::{App, Arg, ArgMatches, SubCommand};
-use gte::{GffReader, RefFlatWriter};
+use gte::{self, GffReader, RefFlatWriter};
 
 use tools::TEMPLATE_SUBCMD;
 use utils;
@@ -85,7 +85,11 @@ pub fn run(args: &ArgMatches) -> ::Result<()> {
         let wresult = result
             .and_then(|ref trx| writer.write_transcript(trx));
         if let Err(e) = wresult {
-            let _ = writeln!(io::stderr(), "error: {}", e);
+            if let gte::Error::Gff(gffe) = e {
+                let _ = writeln!(io::stderr(), "skipping: {}", gffe);
+            } else {
+                return Err(::Error::from(e));
+            }
         }
     }
 
