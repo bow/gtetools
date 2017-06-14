@@ -99,23 +99,22 @@ impl<R: io::Read> Reader<R> {
 
         let mut parts = Vec::new();
         for result in self.raw_rows_stream() {
-            if let Ok(mut row) = result {
-                if let Some(ref pre) = contig_prefix {
-                    row.0 = format!("{}{}", pre, row.0);
+            let mut row = result.map_err(Error::from)?;
+            if let Some(ref pre) = contig_prefix {
+                row.0 = format!("{}{}", pre, row.0);
+            }
+            if let Some((ref lstr, lstr_len)) = lstrip {
+                if row.0.starts_with(lstr) {
+                    let _ = row.0.drain(..lstr_len);
                 }
-                if let Some((ref lstr, lstr_len)) = lstrip {
-                    if row.0.starts_with(lstr) {
-                        let _ = row.0.drain(..lstr_len);
-                    }
-                }
-                match row.2.as_str() {
-                    TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
-                        let rf = TranscriptPart::try_from_row(row, &gid_regex, &tid_regex)
-                            .map_err(Error::from)?;
-                        parts.push(rf);
-                    },
-                    _ => {},
-                }
+            }
+            match row.2.as_str() {
+                TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
+                    let rf = TranscriptPart::try_from_row(row, &gid_regex, &tid_regex)
+                        .map_err(Error::from)?;
+                    parts.push(rf);
+                },
+                _ => {},
             }
         }
         parts.sort_by_key(|ref elem| elem.sort_key());
