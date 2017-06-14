@@ -10,6 +10,7 @@ use std::result;
 use clap::{App, AppSettings, ArgMatches};
 
 mod tools;
+mod utils;
 
 
 const TEMPLATE: &'static str = "
