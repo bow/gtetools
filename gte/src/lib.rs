@@ -16,11 +16,11 @@ use bio::io::gff;
 use csv::Error as CsvError;
 use regex::Error as RegexError;
 
-mod feature;
-pub use feature::{Feature, FeatureError, FeatureKind,
-                  EBuilder, Exon, ExonFeature, ExonFeatureKind,
-                  TBuilder, Transcript, TranscriptFeature, TranscriptFeatureKind,
-                  GBuilder, Gene, GeneFeature, GeneFeatureKind};
+mod model;
+pub use model::{Feature, FeatureError, FeatureKind,
+                EBuilder, Exon, ExonFeature, ExonFeatureKind,
+                TBuilder, Transcript, TranscriptFeature, TranscriptFeatureKind,
+                GBuilder, Gene, GeneFeature, GeneFeatureKind};
 
 mod io_refflat;
 pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,

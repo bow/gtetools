@@ -19,8 +19,7 @@ use csv;
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
-use feature::FeatureError;
-use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, Error, consts};
+use {Coord, FeatureError, Gene, GBuilder, Strand, Transcript, TBuilder, Error, consts};
 
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
