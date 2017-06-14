@@ -115,3 +115,19 @@ mod consts {
     pub(crate) const GENE_ID_STR: &'static str = "gene_id";
     pub(crate) const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
 }
+
+// Generic utilities
+mod utils {
+    use std::ops::Deref;
+
+    // taken from: https://stackoverflow.com/q/31233938/243058
+    pub(crate) trait OptionDeref<T: Deref> {
+        fn as_deref(&self) -> Option<&T::Target>;
+    }
+
+    impl<T: Deref> OptionDeref<T> for Option<T> {
+        fn as_deref(&self) -> Option<&T::Target> {
+            self.as_ref().map(Deref::deref)
+        }
+    }
+}

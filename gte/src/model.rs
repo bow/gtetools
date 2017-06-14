@@ -1,12 +1,13 @@
 use std::cmp::{max, min};
 use std::mem;
 
-use bio::utils::{self, Interval, IntervalError};
+use bio::utils::{self as bio_utils, Interval, IntervalError};
 use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
 use {Coord, Error, RawTrxCoord, consts};
+use utils::OptionDeref;
 use self::ExonFeatureKind::*;
 
 
@@ -26,7 +27,7 @@ macro_rules! impl_common {
             }
 
             pub fn id(&self) -> Option<&str> {
-                self.id.as_ref().map(|id| id.as_str())
+                self.id.as_deref()
             }
 
             pub fn strand(&self) -> &Strand {
@@ -168,7 +169,7 @@ impl Exon {
     }
 
     pub fn transcript_id(&self) -> Option<&str> {
-        self.transcript_id.as_ref().map(|id| id.as_str())
+        self.transcript_id.as_deref()
     }
 
     pub fn set_transcript_id<T>(&mut self, transcript_id: Option<T>)
@@ -178,7 +179,7 @@ impl Exon {
     }
 
     pub fn gene_id(&self) -> Option<&str> {
-        self.gene_id.as_ref().map(|id| id.as_str())
+        self.gene_id.as_deref()
     }
 
     pub fn set_gene_id<T>(&mut self, gene_id: Option<T>)
@@ -339,7 +340,7 @@ impl Transcript {
     }
 
     pub fn gene_id(&self) -> Option<&str> {
-        self.gene_id.as_ref().map(|id| id.as_str())
+        self.gene_id.as_deref()
     }
 
     pub fn set_gene_id<T>(&mut self, gene_id: Option<T>)
@@ -560,8 +561,8 @@ impl TBuilder {
         let strand = resolve_strand_input(self.strand, self.strand_char)
             .map_err(Error::Feature)?;
         let exons = resolve_exons_input(
-            &self.seq_name, &interval, &strand, self.id.as_ref().map(|id| id.as_str()),
-            self.gene_id.as_ref().map(|id| id.as_str()), None, // TODO: allow for exon IDs here
+            &self.seq_name, &interval, &strand, self.id.as_deref(),
+            self.gene_id.as_deref(), None, // TODO: allow for exon IDs here
             self.exons, self.exon_coords.as_ref(), self.coding_coord,
             self.coding_incl_stop).map_err(Error::Feature)?;
 
@@ -688,11 +689,11 @@ impl GBuilder {
 
     pub fn build(self) -> ::Result<Gene> {
         let interval = coord_to_interval(self.start, self.end)
-            .map_err(Error::Feature)?;
+            .map_err(::Error::Feature)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
-            .map_err(Error::Feature)?;
+            .map_err(::Error::Feature)?;
         let transcripts = resolve_transcripts_input(
-            &self.seq_name, &interval, &strand, self.id.as_ref().map(|id| id.as_str()),
+            &self.seq_name, &interval, &strand, self.id.as_deref(),
             self.transcripts, self.transcript_coords, self.transcript_coding_incl_stop)?;
 
         let gene = Gene {
@@ -710,7 +711,7 @@ impl GBuilder {
 quick_error! {
     #[derive(Debug)]
     pub enum FeatureError {
-        InvalidInterval(err: utils::IntervalError) {
+        InvalidInterval(err: bio_utils::IntervalError) {
             description(
                 match err {
                     &IntervalError::InvalidRange =>
@@ -719,7 +720,7 @@ quick_error! {
                 })
             from()
         }
-        InvalidStrandChar(err: utils::StrandError) {
+        InvalidStrandChar(err: bio_utils::StrandError) {
             description(err.description())
             from()
         }
