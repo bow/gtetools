@@ -24,7 +24,7 @@ pub use model::{Feature, FeatureError, FeatureKind,
 
 mod io_refflat;
 pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
-                     RefFlatRow, RefFlatRecord,
+                     RefFlatError, RefFlatRow, RefFlatRecord,
                      RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream};
 
 mod io_gff;
@@ -41,8 +41,11 @@ quick_error! {
             from()
             cause(err)
         }
-        RefFlat(string: &'static str) {
-            description(string)
+        RefFlat(err: RefFlatError) {
+            description(err.description())
+            display("{}", err)
+            from()
+            cause(err)
         }
         Gff(err: GffError) {
             description(err.description())

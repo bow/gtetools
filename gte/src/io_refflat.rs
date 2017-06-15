@@ -10,6 +10,7 @@
 
 use std::cmp::{max, min};
 use std::convert::AsRef;
+use std::error::Error;
 use std::io;
 use std::fs;
 use std::path::Path;
@@ -19,8 +20,26 @@ use csv;
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
-use {Coord, FeatureError, Gene, GBuilder, Strand, Transcript, TBuilder, Error, consts};
+use {Coord, FeatureError, Gene, GBuilder, Strand, Transcript, TBuilder, consts};
+use utils::OptionDeref;
 
+
+quick_error! {
+    #[derive(Debug)]
+    pub enum RefFlatError {
+        ExonCountMismatch(tid: Option<String>) {
+            description("number of exons and number of exon coordinates are not equal")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
+        }
+        MissingGeneId {
+            description("gene identifier attribute not found")
+        }
+        MissingTranscriptId {
+            description("transcript identifier attribute not found")
+        }
+    }
+}
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
 
@@ -44,13 +63,13 @@ impl RefFlatRecord {
 
         let exon_coords = self.zip_raw_exon_coords()?;
         if exon_coords.len() != self.num_exons {
-            return Err(Error::RefFlat(
-                "number of exon and exon coordinates mismatch"));
+            let err = RefFlatError::ExonCountMismatch(Some(self.transcript_name.clone()));
+            return Err(::Error::RefFlat(err));
         }
 
         let strand = Strand::from_char(&self.strand)
             .map_err(FeatureError::from)
-            .map_err(Error::from)?;
+            .map_err(::Error::from)?;
 
         let coding_coord =
             if self.coding_start != self.coding_end {
@@ -66,15 +85,15 @@ impl RefFlatRecord {
             .coords(exon_coords, coding_coord)
             .coding_incl_stop(true)
             .build()
-            .map_err(Error::from)
+            .map_err(::Error::from)
     }
 
     #[inline]
-    fn zip_raw_exon_coords(&self) -> Result<Vec<Coord<u64>>, Error> {
+    fn zip_raw_exon_coords(&self) -> ::Result<Vec<Coord<u64>>> {
         let exon_starts = self.exon_starts
-            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(Error::from));
+            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(::Error::from));
         let exon_ends = self.exon_ends
-            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(Error::from));
+            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(::Error::from));
 
         let mut res = vec![];
         for (rstart, rend) in exon_starts.zip(exon_ends) {
@@ -155,7 +174,7 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
             .map(|row| {
-                row.or_else(|err| Err(Error::from(err)))
+                row.or_else(|err| Err(::Error::from(err)))
                     .map(RefFlatRecord::from)
             })
     }
@@ -206,7 +225,7 @@ impl<'a, R> RefFlatGenesStream<'a, R> where R: io::Read {
                     gene_start = min(gene_start, transcript.start());
                     gene_end = max(gene_end, transcript.end());
                     let tid = transcript.id().map(|id| id.to_owned())
-                        .ok_or(Error::RefFlat("transcript does not have ID"))?;
+                        .ok_or(::Error::from(RefFlatError::MissingTranscriptId))?;
                     transcripts.insert(tid, transcript);
                 }
                 GBuilder::new(seq_name, gene_start, gene_end)
@@ -247,7 +266,7 @@ impl<W: io::Write> Writer<W> {
         self.inner
             .encode((&row.0, &row.1, &row.2, row.3, row.4, row.5, row.6, row.7, row.8,
                      &row.9, &row.10))
-            .map_err(Error::from)
+            .map_err(::Error::from)
     }
 
     pub fn write_record(&mut self, record: &RefFlatRecord) -> ::Result<()> {
@@ -256,12 +275,12 @@ impl<W: io::Write> Writer<W> {
                      record.strand, record.trx_start, record.trx_end,
                      record.coding_start, record.coding_end, record.num_exons,
                      &record.exon_starts, &record.exon_ends))
-            .map_err(Error::from)
+            .map_err(::Error::from)
     }
 
     pub fn write_transcript(&mut self, transcript: &Transcript) -> ::Result<()> {
         let transcript_name = transcript.id()
-            .map(|tn| tn.as_ref()).unwrap_or("");
+            .ok_or(::Error::RefFlat(RefFlatError::MissingTranscriptId))?;
         let strand_char = match transcript.strand() {
             &Strand::Forward => '+',
             &Strand::Reverse => '-',
@@ -277,7 +296,7 @@ impl<W: io::Write> Writer<W> {
                      transcript.start(), transcript.end(),
                      coding_start, coding_end, transcript.exons().len(),
                      exon_starts, exon_ends))
-            .map_err(Error::from)
+            .map_err(::Error::from)
     }
 
     pub fn write_gene(&mut self, gene: &Gene) -> ::Result<()> {
@@ -303,7 +322,7 @@ impl Transcript {
 impl Writer<fs::File> {
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> ::Result<Self> {
-        let f = fs::File::create(path).map_err(Error::from)?;
+        let f = fs::File::create(path).map_err(::Error::from)?;
         Ok(Writer::from_writer(f))
     }
 }
