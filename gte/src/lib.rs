@@ -12,7 +12,6 @@ use std::num::{ParseFloatError, ParseIntError};
 
 pub use bio::utils::Strand;
 pub use bio::io::gff::GffType;
-use bio::io::gff;
 use csv::Error as CsvError;
 use regex::Error as RegexError;
 
@@ -50,11 +49,6 @@ quick_error! {
         Gff(err: GffError) {
             description(err.description())
             display("{}", err)
-            from()
-            cause(err)
-        }
-        BioGff(err: gff::GffError) {
-            description(err.description())
             from()
             cause(err)
         }

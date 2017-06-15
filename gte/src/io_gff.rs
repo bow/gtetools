@@ -67,6 +67,12 @@ quick_error! {
         UnsupportedGffType {
             description("unsupported gff type")
         }
+        Bio(err: gff::GffError) {
+            description(err.description())
+            display("{}", err)
+            from()
+            cause(err)
+        }
     }
 }
 
@@ -173,7 +179,7 @@ impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
-            .map(|row| row.map_err(::Error::from))
+            .map(|row| row.map_err(|e| ::Error::from(GffError::from(e))))
     }
 }
 
@@ -187,7 +193,7 @@ impl<'a, R> Iterator for GffRawRows<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
-            .map(|row| row.map_err(::Error::from))
+            .map(|row| row.map_err(|e| ::Error::from(GffError::from(e))))
     }
 }
 
@@ -626,7 +632,8 @@ impl Gene {
             .strand(strand_to_char(&self.strand()))
             .frame(UNK_CHAR)
             .attributes(attribs)
-            .build()?;
+            .build()
+            .map_err(|e| ::Error::from(GffError::from(e)))?;
         recs.push(gx_record);
 
         for (_, transcript) in self.take_transcripts() {
@@ -670,7 +677,8 @@ impl Transcript {
             .strand(strand_to_char(&self.strand()))
             .frame(UNK_CHAR)
             .attributes(attribs)
-            .build()?;
+            .build()
+            .map_err(|e| ::Error::from(GffError::from(e)))?;
         recs.push(trx_record);
 
         for exon in self.take_exons() {
@@ -725,7 +733,8 @@ impl Exon {
                 .strand(strand_to_char(&self.strand()))
                 .frame(frame)
                 .attributes(attribs.clone())
-                .build()?;
+                .build()
+                .map_err(|e| ::Error::from(GffError::from(e)))?;
 
             recs[1 + idx] = fx_record;
         }
@@ -737,7 +746,8 @@ impl Exon {
             .strand(strand_to_char(&self.strand()))
             .frame(UNK_CHAR)
             .attributes(attribs)
-            .build()?;
+            .build()
+            .map_err(|e| ::Error::from(GffError::from(e)))?;
         recs[0] = exn_record;
 
         Ok(recs)
