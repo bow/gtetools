@@ -7,8 +7,8 @@ use std::io;
 use linked_hash_map::LinkedHashMap;
 
 use gte::{RefFlatReader, RefFlatWriter, RefFlatRecord,
-                 RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream,
-                 Transcript, TBuilder, Gene, GBuilder, Strand};
+          RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream,
+          Transcript, TBuilder, Gene, GBuilder, Strand};
 
 
 static SINGLE_ROW_NO_CDS: &'static str = include_str!("data/single_row_no_cds.refFlat");
@@ -35,7 +35,7 @@ fn refflat_reader_records_single_row_no_cds() {
     let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
-    assert_eq!(rec1.gene_id, "DDX11L1".to_owned());
+    assert_eq!(rec1.gene_id(), "DDX11L1");
 
     assert!(records.next().is_none());
 }
@@ -68,10 +68,10 @@ fn refflat_reader_records_mult_rows_no_cds() {
     let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
-    assert_eq!(rec1.gene_id, "DDX11L1".to_owned());
+    assert_eq!(rec1.gene_id(), "DDX11L1");
 
     let rec2 = next_rec(&mut records);
-    assert_eq!(rec2.gene_id, "MIR570".to_owned());
+    assert_eq!(rec2.gene_id(), "MIR570");
 
     assert!(records.next().is_none());
 }
@@ -110,14 +110,14 @@ fn refflat_reader_records_mult_rows_mult_genes_with_cds() {
     let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
-    assert_eq!(rec1.transcript_name, "NM_001297605".to_owned());
+    assert_eq!(rec1.transcript_id(), "NM_001297605");
 
     let _rec2 = next_rec(&mut records);
     let _rec3 = next_rec(&mut records);
     let _rec4 = next_rec(&mut records);
 
     let rec5 = next_rec(&mut records);
-    assert_eq!(rec5.transcript_name, "NM_138428".to_owned());
+    assert_eq!(rec5.transcript_id(), "NM_138428");
 
     assert!(records.next().is_none());
 }
@@ -168,19 +168,19 @@ fn refflat_writer_rows_single_row_no_cds() {
 
 #[test]
 fn refflat_writer_records_single_row_no_cds() {
-    let rec = RefFlatRecord {
-        gene_id: "DDX11L1".to_owned(),
-        transcript_name: "NR_046018".to_owned(),
-        seq_name: "chr1".to_owned(),
-        strand: '+',
-        trx_start: 11873,
-        trx_end: 14409,
-        coding_start: 14409,
-        coding_end: 14409,
-        num_exons: 3,
-        exon_starts: "11873,12612,13220,".to_owned(),
-        exon_ends: "12227,12721,14409,".to_owned()
-    };
+    let rec = RefFlatRecord::try_from_row((
+        "DDX11L1".to_owned(),
+        "NR_046018".to_owned(),
+        "chr1".to_owned(),
+        '+',
+        11873,
+        14409,
+        14409,
+        14409,
+        3,
+        "11873,12612,13220,".to_owned(),
+        "12227,12721,14409,".to_owned(),
+    )).expect("a refFlat record");
 
     let mut writer = RefFlatWriter::from_memory();
     writer.write_record(&rec).expect("a successful write");
@@ -226,73 +226,71 @@ fn refflat_writer_genes_single_row_no_cds() {
 #[test]
 fn refflat_writer_records_mult_rows_mult_genes_with_cds() {
     let recs = [
-        RefFlatRecord {
-            gene_id: "TNFRSF14".to_owned(),
-            transcript_name: "NM_001297605".to_owned(),
-            seq_name: "chr1".to_owned(),
-            strand: '+',
-            trx_start: 2556364,
-            trx_end: 2565622,
-            coding_start: 2556664,
-            coding_end: 2562868,
-            num_exons: 7,
-            exon_starts: "2556364,2557725,2558342,2559822,2560623,2562864,2563147,".to_owned(),
-            exon_ends: "2556733,2557834,2558468,2559978,2560714,2562896,2565622,".to_owned(),
-        },
-        RefFlatRecord {
-            gene_id: "TNFRSF14".to_owned(),
-            transcript_name: "NM_003820".to_owned(),
-            seq_name: "chr1".to_owned(),
-            strand: '+',
-            trx_start: 2556364,
-            trx_end: 2565622,
-            coding_start: 2556664,
-            coding_end: 2563273,
-            num_exons: 8,
-            exon_starts:
-                "2556364,2557725,2558342,2559822,2560623,2561672,2562864,2563147,".to_owned(),
-            exon_ends:
-                "2556733,2557834,2558468,2559978,2560714,2561815,2562896,2565622,".to_owned(),
-        },
-        RefFlatRecord {
-            gene_id: "SMIM12".to_owned(),
-            transcript_name: "NM_001164824".to_owned(),
-            seq_name: "chr1".to_owned(),
-            strand: '-',
-            trx_start: 34850361,
-            trx_end: 34859045,
-            coding_start: 34855698,
-            coding_end: 34855977,
-            num_exons: 3,
-            exon_starts: "34850361,34856555,34858839,".to_owned(),
-            exon_ends: "34855982,34856739,34859045,".to_owned(),
-        },
-        RefFlatRecord {
-            gene_id: "SMIM12".to_owned(),
-            transcript_name: "NM_001164825".to_owned(),
-            seq_name: "chr1".to_owned(),
-            strand: '-',
-            trx_start: 34850361,
-            trx_end: 34859737,
-            coding_start: 34855698,
-            coding_end: 34855977,
-            num_exons: 2,
-            exon_starts: "34850361,34859454,".to_owned(),
-            exon_ends: "34855982,34859737,".to_owned(),
-        },
-        RefFlatRecord {
-            gene_id: "SMIM12".to_owned(),
-            transcript_name: "NM_138428".to_owned(),
-            seq_name: "chr1".to_owned(),
-            strand: '-',
-            trx_start: 34850361,
-            trx_end: 34859816,
-            coding_start: 34855698,
-            coding_end: 34855977,
-            num_exons: 2,
-            exon_starts: "34850361,34859676,".to_owned(),
-            exon_ends: "34855982,34859816,".to_owned(),
-        },
+        RefFlatRecord::try_from_row((
+            "TNFRSF14".to_owned(),
+            "NM_001297605".to_owned(),
+            "chr1".to_owned(),
+            '+',
+            2556364,
+            2565622,
+            2556664,
+            2562868,
+            7,
+            "2556364,2557725,2558342,2559822,2560623,2562864,2563147,".to_owned(),
+            "2556733,2557834,2558468,2559978,2560714,2562896,2565622,".to_owned(),
+        )).expect("a refFlat record"),
+        RefFlatRecord::try_from_row((
+            "TNFRSF14".to_owned(),
+            "NM_003820".to_owned(),
+            "chr1".to_owned(),
+            '+',
+            2556364,
+            2565622,
+            2556664,
+            2563273,
+            8,
+            "2556364,2557725,2558342,2559822,2560623,2561672,2562864,2563147,".to_owned(),
+            "2556733,2557834,2558468,2559978,2560714,2561815,2562896,2565622,".to_owned(),
+        )).expect("a refFlat record"),
+        RefFlatRecord::try_from_row((
+            "SMIM12".to_owned(),
+            "NM_001164824".to_owned(),
+            "chr1".to_owned(),
+            '-',
+            34850361,
+            34859045,
+            34855698,
+            34855977,
+            3,
+            "34850361,34856555,34858839,".to_owned(),
+            "34855982,34856739,34859045,".to_owned(),
+        )).expect("a refFlat record"),
+        RefFlatRecord::try_from_row((
+            "SMIM12".to_owned(),
+            "NM_001164825".to_owned(),
+            "chr1".to_owned(),
+            '-',
+            34850361,
+            34859737,
+            34855698,
+            34855977,
+            2,
+            "34850361,34859454,".to_owned(),
+            "34855982,34859737,".to_owned(),
+        )).expect("a refFlat record"),
+        RefFlatRecord::try_from_row((
+            "SMIM12".to_owned(),
+            "NM_138428".to_owned(),
+            "chr1".to_owned(),
+            '-',
+            34850361,
+            34859816,
+            34855698,
+            34855977,
+            2,
+            "34850361,34859676,".to_owned(),
+            "34855982,34859816,".to_owned(),
+        )).expect("a refFlat record"),
     ];
 
     let mut writer = RefFlatWriter::from_writer(vec![]);

@@ -9,7 +9,7 @@ use multimap::MultiMap;
 
 use {Coord, RawTrxCoord, consts};
 use consts::DEF_ID;
-use utils::OptionDeref;
+use utils::{OptionDeref, coord_to_interval};
 
 use self::ExonFeatureKind::*;
 
@@ -780,11 +780,6 @@ quick_error! {
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
     }
-}
-
-#[inline(always)]
-fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
-    Interval::new(start..end).map_err(FeatureError::from)
 }
 
 fn resolve_strand_input(

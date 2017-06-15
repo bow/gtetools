@@ -122,6 +122,10 @@ mod consts {
 mod utils {
     use std::ops::Deref;
 
+    use bio::utils::Interval;
+
+    use super::FeatureError;
+
     // taken from: https://stackoverflow.com/q/31233938/243058
     pub(crate) trait OptionDeref<T: Deref> {
         fn as_deref(&self) -> Option<&T::Target>;
@@ -131,5 +135,10 @@ mod utils {
         fn as_deref(&self) -> Option<&T::Target> {
             self.as_ref().map(Deref::deref)
         }
+    }
+
+    #[inline(always)]
+    pub(crate) fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
+        Interval::new(start..end).map_err(FeatureError::from)
     }
 }

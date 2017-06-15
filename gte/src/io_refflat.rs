@@ -20,7 +20,7 @@ use csv;
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
-use {Coord, FeatureError, Gene, GBuilder, Strand, Transcript, TBuilder, consts};
+use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, consts};
 use utils::OptionDeref;
 
 
@@ -29,6 +29,11 @@ quick_error! {
     pub enum RefFlatError {
         ExonCountMismatch(tid: Option<String>) {
             description("number of exons and number of exon coordinates are not equal")
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
+        }
+        ExonCoordsMismatch(tid: Option<String>) {
+            description("number of exon start and stop coordinates are not equal")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
         }
@@ -44,83 +49,178 @@ quick_error! {
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
 
 pub struct RefFlatRecord {
-    pub gene_id: String,
-    pub transcript_name: String,
-    pub seq_name: String,
-    pub strand: char,
-    pub trx_start: u64,
-    pub trx_end: u64,
-    pub coding_start: u64,
-    pub coding_end: u64,
-    pub num_exons: usize,
-    pub exon_starts: String,
-    pub exon_ends: String,
+    gene_id: String,
+    transcript_id: String,
+    seq_name: String,
+    strand: char,
+    transcript_start: u64,
+    transcript_end: u64,
+    coding_start: u64,
+    coding_end: u64,
+    exon_starts: Vec<u64>,
+    exon_ends: Vec<u64>,
 }
 
 impl RefFlatRecord {
 
-    pub fn into_transcript(self) -> ::Result<Transcript> {
+    pub fn gene_id(&self) -> &str {
+        self.gene_id.as_str()
+    }
 
-        let exon_coords = self.zip_raw_exon_coords()?;
-        if exon_coords.len() != self.num_exons {
-            let err = RefFlatError::ExonCountMismatch(Some(self.transcript_name.clone()));
+    pub fn set_gene_id<T>(&mut self, gene_id: T)
+        where T: Into<String>
+    {
+        self.gene_id = gene_id.into();
+    }
+
+    pub fn transcript_id(&self) -> &str {
+        self.transcript_id.as_str()
+    }
+
+    pub fn set_transcript_id<T>(&mut self, transcript_id: T)
+        where T: Into<String> + AsRef<str>
+    {
+        self.transcript_id = transcript_id.into();
+    }
+
+    pub fn seq_name(&self) -> &str {
+        self.seq_name.as_str()
+    }
+
+    pub fn set_seq_name<T>(&mut self, seq_name: T)
+        where T: Into<String>
+    {
+        self.seq_name = seq_name.into();
+    }
+
+    pub fn strand(&self) -> char {
+        self.strand
+    }
+
+    pub fn set_strand(&mut self, strand_char: char) {
+        self.strand = strand_char;
+    }
+
+    pub fn transcript_start(&self) -> u64 {
+        self.transcript_start
+    }
+
+    pub fn set_transcript_start(&mut self, coord: u64) {
+        self.transcript_start = coord;
+    }
+
+    pub fn transcript_end(&self) -> u64 {
+        self.transcript_end
+    }
+
+    pub fn set_transcript_end(&mut self, coord: u64) {
+        self.transcript_end = coord;
+    }
+
+    pub fn coding_start(&self) -> u64 {
+        self.coding_start
+    }
+
+    pub fn set_coding_start(&mut self, coord: u64) {
+        self.coding_start = coord;
+    }
+
+    pub fn coding_end(&self) -> u64 {
+        self.coding_end
+    }
+
+    pub fn set_coding_end(&mut self, coord: u64) {
+        self.coding_end = coord;
+    }
+
+    pub fn num_exons(&self) -> usize {
+        self.exon_starts.len() // must be the same as exon_ends
+    }
+
+    pub fn exon_starts(&self) -> &[u64] {
+        self.exon_starts.as_slice()
+    }
+
+    pub fn exon_ends(&self) -> &[u64] {
+        self.exon_ends.as_slice()
+    }
+
+    pub fn set_exon_coords(&mut self, starts: Vec<u64>, ends: Vec<u64>) -> ::Result<()> {
+        if starts.len() != ends.len() {
+            let tid = self.transcript_id.clone();
+            let err = ::Error::from(RefFlatError::ExonCountMismatch(Some(tid)));
+            return Err(err);
+        }
+        self.exon_starts = starts;
+        self.exon_ends = ends;
+        Ok(())
+    }
+
+    pub fn try_from_row(row: RefFlatRow) -> ::Result<Self> {
+
+        let exon_starts = Self::parse_coords(row.9.as_str())?;
+        let exon_ends = Self::parse_coords(row.10.as_str())?;
+        if exon_starts.len() != row.8 {
+            let err = RefFlatError::ExonCountMismatch(Some(row.1.clone()));
+            return Err(::Error::RefFlat(err));
+        }
+        if exon_starts.len() != exon_ends.len() {
+            let err = RefFlatError::ExonCoordsMismatch(Some(row.1.clone()));
             return Err(::Error::RefFlat(err));
         }
 
-        let strand = Strand::from_char(&self.strand)
-            .map_err(FeatureError::from)
-            .map_err(::Error::from)?;
+        Ok(RefFlatRecord {
+            gene_id: row.0,
+            transcript_id: row.1,
+            seq_name: row.2,
+            strand: row.3,
+            transcript_start: row.4,
+            transcript_end: row.5,
+            coding_start: row.6,
+            coding_end: row.7,
+            exon_starts: exon_starts,
+            exon_ends: exon_ends,
+        })
+    }
 
-        let coding_coord =
-            if self.coding_start != self.coding_end {
-                Some((self.coding_start, self.coding_end))
-            } else {
+    pub fn into_transcript(self) -> ::Result<Transcript> {
+
+        if self.transcript_id.is_empty() {
+            return Err(::Error::from(::RefFlatError::MissingTranscriptId));
+        }
+        if self.gene_id.is_empty() {
+            return Err(::Error::from(::RefFlatError::MissingGeneId));
+        }
+        let coding_interval =
+            if self.coding_start == self.coding_end {
                 None
+            } else {
+                Some((self.coding_start, self.coding_end))
             };
 
-        TBuilder::new(self.seq_name, self.trx_start, self.trx_end)
-            .id(self.transcript_name)
+        let exon_coords = self.exon_starts.into_iter().zip(self.exon_ends.into_iter())
+            .collect::<Vec<Coord<u64>>>();
+
+        TBuilder::new(self.seq_name, self.transcript_start, self.transcript_end)
+            .id(self.transcript_id)
             .gene_id(self.gene_id)
-            .strand(strand)
-            .coords(exon_coords, coding_coord)
+            .strand_char(self.strand)
+            .coords(exon_coords, coding_interval)
             .coding_incl_stop(true)
             .build()
             .map_err(::Error::from)
     }
 
     #[inline]
-    fn zip_raw_exon_coords(&self) -> ::Result<Vec<Coord<u64>>> {
-        let exon_starts = self.exon_starts
-            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(::Error::from));
-        let exon_ends = self.exon_ends
+    fn parse_coords(raw_coords: &str) -> ::Result<Vec<u64>> {
+        let rcoords = raw_coords
             .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(::Error::from));
 
         let mut res = vec![];
-        for (rstart, rend) in exon_starts.zip(exon_ends) {
-            let start = rstart?;
-            let end = rend?;
-            res.push((start, end));
+        for rcoord in rcoords {
+            res.push(rcoord?);
         }
         Ok(res)
-    }
-}
-
-impl From<RefFlatRow> for RefFlatRecord {
-
-    fn from(row: RefFlatRow) -> Self {
-        RefFlatRecord {
-            gene_id: row.0,
-            transcript_name: row.1,
-            seq_name: row.2,
-            strand: row.3,
-            trx_start: row.4,
-            trx_end: row.5,
-            coding_start: row.6,
-            coding_end: row.7,
-            num_exons: row.8,
-            exon_starts: row.9,
-            exon_ends: row.10,
-        }
     }
 }
 
@@ -175,7 +275,7 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
         self.inner.next()
             .map(|row| {
                 row.or_else(|err| Err(::Error::from(err)))
-                    .map(RefFlatRecord::from)
+                    .and_then(RefFlatRecord::try_from_row)
             })
     }
 }
@@ -270,11 +370,15 @@ impl<W: io::Write> Writer<W> {
     }
 
     pub fn write_record(&mut self, record: &RefFlatRecord) -> ::Result<()> {
+        let mut exon_starts = record.exon_starts.iter().join(",");
+        exon_starts.push(',');
+        let mut exon_ends = record.exon_ends.iter().join(",");
+        exon_ends.push(',');
         self.inner
-            .encode((&record.gene_id, &record.transcript_name, &record.seq_name,
-                     record.strand, record.trx_start, record.trx_end,
-                     record.coding_start, record.coding_end, record.num_exons,
-                     &record.exon_starts, &record.exon_ends))
+            .encode((&record.gene_id, &record.transcript_id, &record.seq_name,
+                     record.strand, record.transcript_start, record.transcript_end,
+                     record.coding_start, record.coding_end, record.num_exons(),
+                     exon_starts, exon_ends))
             .map_err(::Error::from)
     }
 
