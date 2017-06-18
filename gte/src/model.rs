@@ -7,15 +7,12 @@ use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
-use {Coord, consts};
+use {Coord, RawTrxCoords, consts};
 use consts::DEF_ID;
 use utils::{OptionDeref, coord_to_interval};
 
 use self::ExonFeatureKind::*;
 
-
-// Helper type alias for raw transcript coordinate inputs
-type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
 
 macro_rules! impl_common {
     ($struct_ty:ty) => (
@@ -626,7 +623,7 @@ pub struct GBuilder {
     id: Option<String>,
     attributes: MultiMap<String, String>,
     transcripts: Option<LinkedHashMap<String, Transcript>>,
-    transcript_coords: Option<LinkedHashMap<String, RawTrxCoord>>,
+    transcript_coords: Option<LinkedHashMap<String, RawTrxCoords>>,
     transcript_coding_incl_stop: bool,
 }
 
@@ -683,7 +680,7 @@ impl GBuilder {
         self
     }
 
-    pub fn transcript_coords(mut self, coords: LinkedHashMap<String, RawTrxCoord>)-> Self {
+    pub fn transcript_coords(mut self, coords: LinkedHashMap<String, RawTrxCoords>)-> Self {
         self.transcript_coords = Some(coords);
         self
     }
@@ -844,7 +841,7 @@ fn resolve_transcripts_input(
     gene_strand: &Strand,
     gene_id: Option<&str>,
     transcripts: Option<LinkedHashMap<String, Transcript>>,
-    transcript_coords: Option<LinkedHashMap<String, RawTrxCoord>>,
+    transcript_coords: Option<LinkedHashMap<String, RawTrxCoords>>,
     transcript_coding_incl_stop: bool
 ) -> ::Result<LinkedHashMap<String, Transcript>>
 {

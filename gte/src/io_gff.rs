@@ -13,7 +13,8 @@ use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 use regex::Regex;
 
-use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript};
+use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript,
+     RawTrxCoords};
 use consts::*;
 use utils::OptionDeref;
 
@@ -355,6 +356,98 @@ impl TrxPart {
     }
 }
 
+#[derive(Debug, Default)]
+struct TrxCoords {
+    trx_coord: Option<Coord<u64>>,
+    exon_coords: Vec<Coord<u64>>,
+    cds_coord: Option<Coord<u64>>,
+    codon_5: Option<u64>,
+    codon_3: Option<u64>,
+}
+
+impl TrxCoords {
+
+    fn set_trx_coord(&mut self, coord: Coord<u64>) -> Result<(), GffError> {
+        if let None = self.trx_coord {
+            self.trx_coord = Some(coord);
+        } else {
+            return Err(GffError::MultipleTranscripts);
+        }
+        Ok(())
+    }
+
+    fn add_exon_coord(&mut self, coord: Coord<u64>) {
+        self.exon_coords.push(coord);
+    }
+
+    fn include_cds_coord(&mut self, coord: Coord<u64>) {
+        self.cds_coord = (self.cds_coord).or(Some(INIT_COORD))
+            .map(|(a, b)| (min(a, coord.0), max(b, coord.1)));
+    }
+
+    fn include_codon_5(&mut self, coord_5: u64) {
+        self.codon_5 = (self.codon_5).or(Some(INIT_START))
+            .map(|c| min(c, coord_5));
+    }
+
+    fn include_codon_3(&mut self, coord_3: u64) {
+        self.codon_3 = (self.codon_3).or(Some(INIT_END))
+            .map(|c| max(c, coord_3));
+    }
+
+    fn resolve<'a>(
+        mut self,
+        strand: Strand,
+        loose_codons: bool,
+        tid: Option<&'a str>
+    ) -> Result<RawTrxCoords, GffError> {
+
+        let trx_coord = self.trx_coord
+            .ok_or(GffError::MissingTranscript(tid.map(|v| v.to_owned())))?;
+
+        let coding_coord = match (self.codon_5, self.codon_3) {
+            // common case: stop and start codon defined
+            (Some(c5), Some(c3)) => Some((c5, c3)),
+            // expected case: no stop and start codon defined
+            (None, None) => None,
+            // error case: only stop or start codon defined
+            (a, b) => {
+                if !loose_codons {
+                    let start = a
+                        .ok_or(GffError::OrphanStop(tid.map(|v| v.to_owned())))?;
+                    let end = b
+                        .ok_or(GffError::OrphanStart(tid.map(|v| v.to_owned())))?;
+                    Some((start, end))
+                } else {
+                    let start = a.or(self.cds_coord.map(|c| c.0))
+                        .ok_or(GffError::OrphanCds(tid.map(|v| v.to_owned())))?;
+                    let end = b.or(self.cds_coord.map(|c| c.1))
+                        .ok_or(GffError::OrphanCds(tid.map(|v| v.to_owned())))?;
+                    Some((start, end))
+                }
+            }
+        };
+
+        if !loose_codons {
+            if let Some((start, end)) = coding_coord {
+                let cdsc = self.cds_coord
+                    .ok_or(GffError::OrphanCodon(tid.map(|v| v.to_owned())))?;
+                match strand {
+                    Strand::Forward if end == cdsc.1 => {
+                        return Err(GffError::StopCodonInCds(tid.map(|v| v.to_owned())));
+                    },
+                    Strand::Reverse if start > cdsc.0 => {
+                        return Err(GffError::StopCodonInCds(tid.map(|v| v.to_owned())));
+                    },
+                    _ => {},
+                }
+            }
+        }
+
+        Ok((trx_coord, self.exon_coords, coding_coord))
+    }
+}
+
 pub struct GffTranscripts {
     groups: GroupBy<TrxGroupKey, vec::IntoIter<TrxPart>, TrxGroupFunc>,
     loose_codons: bool,
@@ -371,49 +464,35 @@ impl Iterator for GffTranscripts {
     type Item = ::Result<Transcript>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let group_to_transcript = |(key, rfs): (TrxGroupKey, TrxGroup)| {
+        let group_to_transcript = |(key, tps): (TrxGroupKey, TrxGroup)| {
             let (gid, tid, chrom, strand) = key;
-            let mut exn_coords = Vec::new();
-            let mut trx_coord = None;
-            let mut cds_coord = None;
-            let mut codon_5 = None;
-            let mut codon_3 = None;
+            let mut tc = TrxCoords::default();
 
-            for rf in rfs {
-                match (rf.feature.as_str(), strand) {
+            for tp in tps {
+                match (tp.feature.as_str(), strand) {
                     (TRANSCRIPT_STR, _) => {
-                        if let None = trx_coord {
-                            trx_coord = Some(rf.coord);
-                        } else {
-                            let err = ::Error::Gff(GffError::MultipleTranscripts);
-                            return Err(err);
-                        }
+                        tc.set_trx_coord(tp.coord)
+                            .map_err(::Error::from)?;
                     },
                     (EXON_STR, _) => {
-                        exn_coords.push(rf.coord);
+                        tc.add_exon_coord(tp.coord);
                     },
                     (CDS_STR, _) => {
-                        cds_coord = (cds_coord).or(Some(INIT_COORD))
-                            .map(|(a, b)| (min(a, rf.coord.0), max(b, rf.coord.1)));
+                        tc.include_cds_coord(tp.coord);
                     },
                     (START_CODON_STR, Strand::Forward) | (STOP_CODON_STR, Strand::Reverse) => {
-                        codon_5 = (codon_5).or(Some(INIT_START)).map(|c| min(c, rf.coord.0))
+                        tc.include_codon_5(tp.coord.0);
                     },
                     (STOP_CODON_STR, Strand::Forward) | (START_CODON_STR, Strand::Reverse) => {
-                        codon_3 = (codon_3).or(Some(INIT_END)).map(|c| max(c, rf.coord.1))
+                        tc.include_codon_3(tp.coord.1);
                     },
                     _ => {},
                 }
             }
 
-            let (trx_start, trx_end) = trx_coord
-                .ok_or(GffError::MissingTranscript(Some(tid.clone())))
-                .map_err(::Error::from)?;
-
-            let coding_coord =
-                resolve_coding(Some(tid.as_str()), codon_5, codon_3, cds_coord, &strand,
-                               self.loose_codons)
-                .map_err(::Error::from)?;
+            let ((trx_start, trx_end), exn_coords, coding_coord) =
+                tc.resolve(strand, self.loose_codons, Some(tid.as_str()))
+                    .map_err(::Error::from)?;
 
             TBuilder::new(chrom, trx_start, trx_end)
                 .id(tid)
@@ -428,55 +507,7 @@ impl Iterator for GffTranscripts {
     }
 }
 
-fn resolve_coding(
-    tid: Option<&str>,
-    codon_5: Option<u64>,
-    codon_3: Option<u64>,
-    cds_coord: Option<Coord<u64>>,
-    strand: &Strand,
     loose_codons: bool,
-) -> Result<Option<Coord<u64>>, GffError>
-{
-    let coding_coord = match (codon_5, codon_3) {
-        // common case: stop and start codon defined
-        (Some(c5), Some(c3)) => Some((c5, c3)),
-        // expected case: no stop and start codon defined
-        (None, None) => None,
-        // error case: only stop or start codon defined
-        (a, b) => {
-            if !loose_codons {
-                let start = a
-                    .ok_or(GffError::OrphanStop(tid.map(|v| v.to_owned())))?;
-                let end = b
-                    .ok_or(GffError::OrphanStart(tid.map(|v| v.to_owned())))?;
-                Some((start, end))
-            } else {
-                let start = a.or(cds_coord.map(|c| c.0))
-                    .ok_or(GffError::OrphanCds(tid.map(|v| v.to_owned())))?;
-                let end = b.or(cds_coord.map(|c| c.1))
-                    .ok_or(GffError::OrphanCds(tid.map(|v| v.to_owned())))?;
-                Some((start, end))
-            }
-        }
-    };
-
-    if !loose_codons {
-        if let Some((start, end)) = coding_coord {
-            let cdsc = cds_coord
-                .ok_or(GffError::OrphanCodon(tid.map(|v| v.to_owned())))?;
-            match strand {
-                &Strand::Forward if end == cdsc.1 => {
-                    return Err(GffError::StopCodonInCds(tid.map(|v| v.to_owned())));
-                },
-                &Strand::Reverse if start > cdsc.0 => {
-                    return Err(GffError::StopCodonInCds(tid.map(|v| v.to_owned())));
-                },
-                _ => {},
-            }
-        }
-    }
-
-    Ok(coding_coord)
 }
 
 fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> ::Result<Regex> {
