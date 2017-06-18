@@ -7,12 +7,15 @@ use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
-use {Coord, RawTrxCoord, consts};
+use {Coord, consts};
 use consts::DEF_ID;
 use utils::{OptionDeref, coord_to_interval};
 
 use self::ExonFeatureKind::*;
 
+
+// Helper type alias for raw transcript coordinate inputs
+type RawTrxCoord = (Coord<u64>, Vec<Coord<u64>>, Option<Coord<u64>>);
 
 macro_rules! impl_common {
     ($struct_ty:ty) => (

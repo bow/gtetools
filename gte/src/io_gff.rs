@@ -13,8 +13,7 @@ use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 use regex::Regex;
 
-use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript,
-     RawTrxCoord};
+use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript};
 use consts::*;
 use utils::OptionDeref;
 
@@ -127,7 +126,7 @@ impl<R: io::Read> Reader<R> {
             }
             match row.2.as_str() {
                 TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
-                    let rf = TranscriptPart::try_from_row(row, &gid_regex, &tid_regex)
+                    let rf = TrxPart::try_from_row(row, &gid_regex, &tid_regex)
                         .map_err(::Error::from)?;
                     parts.push(rf);
                 },
@@ -137,7 +136,7 @@ impl<R: io::Read> Reader<R> {
         parts.sort_by_key(|ref elem| elem.sort_key());
 
         Ok(GffTranscripts {
-            groups: parts.into_iter().group_by(TranscriptPart::group_key),
+            groups: parts.into_iter().group_by(TrxPart::transcript_group_key),
             loose_codons: loose_codons,
         })
     }
@@ -298,7 +297,7 @@ impl<'a, R> Iterator for GffGenesStream<'a, R> where R: io::Read {
 
 
 #[derive(Debug, PartialEq)]
-struct TranscriptPart {
+struct TrxPart {
     feature: String,
     chrom: String,
     coord: Coord<u64>,
@@ -308,12 +307,9 @@ struct TranscriptPart {
 }
 
 // sort key: gene identifier, transcript identifier, contig name, start, end, strand num
-type TPSortKey = (String, String, String, u64, u64, u8);
+type TrxSortKey = (String, String, String, u64, u64, u8);
 
-// group key: gene identifier, transcript identifier, contig name, strand
-type TPGroupKey = (String, String, String, Strand);
-
-impl TranscriptPart {
+impl TrxPart {
 
     fn try_from_row(
         row: gff::RawRow,
@@ -331,7 +327,7 @@ impl TranscriptPart {
             .map(|v| v.as_str().to_owned())
             .ok_or(GffError::MissingTranscriptId)?;
 
-        Ok(TranscriptPart {
+        Ok(TrxPart {
             feature: row.2,
             chrom: row.0,
             coord: (row.3 - 1, row.4),
@@ -341,12 +337,12 @@ impl TranscriptPart {
         })
     }
 
-    fn sort_key(&self) -> TPSortKey {
+    fn sort_key(&self) -> TrxSortKey {
         (self.gene_id.clone(), self.transcript_id.clone(),
          self.chrom.clone(), self.coord.0, self.coord.1, self.strand_ord())
     }
 
-    fn group_key(&self) -> TPGroupKey {
+    fn transcript_group_key(&self) -> TrxGroupKey {
         (self.gene_id.clone(), self.transcript_id.clone(), self.chrom.clone(), self.strand)
     }
 
@@ -360,20 +356,22 @@ impl TranscriptPart {
 }
 
 pub struct GffTranscripts {
-    groups: GroupBy<TPGroupKey, vec::IntoIter<TranscriptPart>, TPGroupFunc>,
+    groups: GroupBy<TrxGroupKey, vec::IntoIter<TrxPart>, TrxGroupFunc>,
     loose_codons: bool,
 }
 
-type TPGroupFunc = fn(&TranscriptPart) -> TPGroupKey;
+type TrxGroupKey = (String, String, String, Strand);
 
-type TPGroup<'a> = Group<'a, TPGroupKey, vec::IntoIter<TranscriptPart>, TPGroupFunc>;
+type TrxGroupFunc = fn(&TrxPart) -> TrxGroupKey;
+
+type TrxGroup<'a> = Group<'a, TrxGroupKey, vec::IntoIter<TrxPart>, TrxGroupFunc>;
 
 impl Iterator for GffTranscripts {
 
     type Item = ::Result<Transcript>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let group_to_transcript = |(key, rfs): (TPGroupKey, TPGroup)| {
+        let group_to_transcript = |(key, rfs): (TrxGroupKey, TrxGroup)| {
             let (gid, tid, chrom, strand) = key;
             let mut exn_coords = Vec::new();
             let mut trx_coord = None;
