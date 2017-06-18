@@ -65,16 +65,13 @@ fn gtf_reader_single_gene() {
     assert!(genes.next().is_none());
 }
 
-fn next_trx<R>(rt: &mut GffTranscriptsStream<R>) -> Transcript where R: io::Read {
-    rt.next().expect("a transcript result").expect("a transcript")
-}
 
 #[test]
-fn gtf_reader_multiple_transcripts_stream() {
+fn gtf_reader_multiple_transcripts() {
     let mut reader = GffReader::from_reader(SINGLE_GENE_GTF.as_bytes(), GffType::GTF2);
-    let mut transcripts = reader.transcripts_stream();
+    let mut transcripts = reader.transcripts(None, None, None, None, false).expect("transcripts");
 
-    let trx1 = next_trx(&mut transcripts);
+    let trx1 = transcripts.next().expect("a transcript result").expect("a transcript");
     assert_eq!(trx1.seq_name(), "chr2");
     assert_eq!(trx1.start(), 176188578);
     assert_eq!(trx1.end(), 176190907);
@@ -99,7 +96,7 @@ fn gtf_reader_multiple_transcripts_stream() {
         assert_eq!(feat.kind(), &trx1_exon2[eidx].1)
     }
 
-    let trx2 = next_trx(&mut transcripts);
+    let trx2 = transcripts.next().expect("a transcript result").expect("a transcript");
     assert_eq!(trx2.seq_name(), "chr2");
     assert_eq!(trx2.start(), 176188842);
     assert_eq!(trx2.end(), 176188901);

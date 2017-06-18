@@ -98,14 +98,6 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    pub fn transcripts_stream(&mut self) -> GffTranscriptsStream<R> {
-        GffTranscriptsStream {
-            inner: self.records_stream()
-                .filter(GffTranscriptsStream::<R>::transcript_filter_func as TrxFilterFunc)
-                .group_by(GffTranscriptsStream::<R>::transcript_group_func),
-        }
-    }
-
     pub fn transcripts<'a>(
         &mut self,
         gene_id_attr: Option<&'a str>,
@@ -300,105 +292,6 @@ impl<'a, R> Iterator for GffGenesStream<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.into_iter().map(Self::group_to_gene).next()
-            .map(|res| res.map_err(::Error::from))
-    }
-}
-
-pub struct GffTranscriptsStream<'a, R: 'a> where R: io::Read {
-    inner: GroupBy<TrxGroupKey, TrxRecords<'a, R>, TrxGroupFunc>,
-}
-
-type TrxFilterFunc = fn(&::Result<gff::Record>) -> bool;
-
-type TrxRecords<'a, R> = Filter<GffRecords<'a, R>, TrxFilterFunc>;
-
-type TrxGroupKey = Option<(String, String, String, Strand)>;
-
-type TrxGroupFunc = fn(&::Result<gff::Record>) -> TrxGroupKey;
-
-type TrxGroupedRecs<'a, 'b, R> = Group<'b, TrxGroupKey, TrxRecords<'a, R>, TrxGroupFunc>;
-
-impl<'a, R> GffTranscriptsStream<'a, R> where R: io::Read {
-
-    fn transcript_filter_func(result: &::Result<gff::Record>) -> bool {
-        match result {
-            &Ok(ref rec) =>
-                rec.attributes().contains_key(GENE_ID_STR) &&
-                rec.attributes().contains_key(TRANSCRIPT_ID_STR),
-            &Err(_) => true,
-        }
-    }
-
-    fn transcript_group_func(result: &::Result<gff::Record>) -> TrxGroupKey {
-        result.as_ref().ok()
-            .map(|res| {
-                let gene_id = res.attributes().get(GENE_ID_STR)
-                    .expect("'gene_id' attribute not found")
-                    .clone();
-                let transcript_id = res.attributes().get(TRANSCRIPT_ID_STR)
-                    .expect("'transcript_id' attribute not found")
-                    .clone();
-                let seq_name = res.seqname().to_owned();
-                let strand = res.strand();
-
-                (seq_name, gene_id, transcript_id, strand)
-            })
-    }
-
-    fn group_to_transcript<'b>(group: (TrxGroupKey, TrxGroupedRecs<'a, 'b, R>)
-    ) -> ::Result<Transcript>
-    {
-        let (group_key, records) = group;
-        match group_key {
-
-            None => Err(records.filter_map(|x| x.err()).next().unwrap()),
-
-            // TODO: Create features of the parsed records instead of just capturing coordinates.
-            Some((seq_name, gid, tid, strand)) => {
-
-                let mut trx_coord = INIT_COORD;
-                let mut exn_coords = Vec::<Coord<u64>>::new();
-                let mut coding_coord: Option<Coord<u64>> = None;
-
-                for record in records {
-
-                    let mut rec = record?;
-                    rec.attributes_mut().remove(GENE_ID_STR);
-                    rec.attributes_mut().remove(TRANSCRIPT_ID_STR);
-
-                    match rec.feature_type() {
-                        Some(TRANSCRIPT_STR) => {
-                            trx_coord = adjust_coord(trx_coord, &rec);
-                        },
-                        Some(EXON_STR) => {
-                            exn_coords.push((rec.start(), rec.end()));
-                        },
-                        Some(CDS_STR) => {
-                            coding_coord = (coding_coord).or(Some(INIT_COORD))
-                                .map(|coord| adjust_coord(coord, &rec));
-                        },
-                        _ => {},
-                    }
-                }
-
-                TBuilder::new(seq_name, trx_coord.0, trx_coord.1)
-                    .id(tid)
-                    .gene_id(gid.clone())
-                    .strand(strand)
-                    .coords(exn_coords, coding_coord)
-                    .coding_incl_stop(false)
-                    .build()
-            }
-        }
-    }
-}
-
-impl<'a, R> Iterator for GffTranscriptsStream<'a, R> where R: io::Read {
-
-    type Item = ::Result<Transcript>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.into_iter().map(Self::group_to_transcript).next()
             .map(|res| res.map_err(::Error::from))
     }
 }
