@@ -14,7 +14,7 @@ use regex::Regex;
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, Strand, TBuilder, Transcript,
      RawTrxCoords};
 use consts::*;
-use utils::OptionDeref;
+use utils::{OptionDeref, update_contig};
 
 
 quick_error! {
@@ -107,14 +107,7 @@ impl<R: io::Read> Reader<R> {
         let mut parts = Vec::new();
         for result in self.raw_rows_stream() {
             let mut row = result.map_err(::Error::from)?;
-            if let Some(ref pre) = contig_prefix {
-                row.0 = format!("{}{}", pre, row.0);
-            }
-            if let Some((ref lstr, lstr_len)) = lstrip {
-                if row.0.starts_with(lstr) {
-                    let _ = row.0.drain(..lstr_len);
-                }
-            }
+            update_contig(&mut row.0, contig_prefix, lstrip);
             match row.2.as_str() {
                 TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
                     let rf = TrxPart::try_from_row(row, &gid_regex, &tid_regex)

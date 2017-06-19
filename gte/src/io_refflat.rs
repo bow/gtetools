@@ -21,7 +21,7 @@ use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
 use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, consts};
-use utils::OptionDeref;
+use utils::{OptionDeref, update_contig};
 
 
 quick_error! {
@@ -296,19 +296,13 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
 
     fn next(&mut self) -> Option<Self::Item> {
         let lstrip = self.contig_lstrip.as_ref().map(|v| (v.as_str(), v.len()));
+        let prefix = self.contig_prefix.as_deref();
         self.inner.next()
             .map(|row| {
                 row
                     .or_else(|err| Err(::Error::from(err)))
                     .map(|mut row| {
-                        if let Some(ref pre) = self.contig_prefix.as_ref() {
-                            row.2 = format!("{}{}", pre, row.2);
-                        }
-                        if let Some((ref lstr, lstr_len)) = lstrip {
-                            if row.2.starts_with(lstr) {
-                                let _ = row.2.drain(..lstr_len);
-                            }
-                        }
+                        update_contig(&mut row.2, prefix, lstrip);
                         row
                     })
                     .and_then(RefFlatRecord::try_from_row)

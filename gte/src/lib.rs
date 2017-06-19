@@ -131,4 +131,20 @@ mod utils {
             self.as_ref().map(Deref::deref)
         }
     }
+
+    #[inline]
+    pub(crate) fn update_contig<'a>(
+        value: &'a mut String,
+        prefix: Option<&'a str>,
+        lstrip: Option<(&'a str, usize)>,
+    ) {
+        if let Some(ref pre) = prefix {
+            value.insert_str(0, pre);
+        }
+        if let Some((ref lstr, lstr_len)) = lstrip {
+            if value.starts_with(lstr) {
+                let _ = value.drain(..lstr_len);
+            }
+        }
+    }
 }
