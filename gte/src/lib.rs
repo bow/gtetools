@@ -27,8 +27,7 @@ pub use io_refflat::{Reader as RefFlatReader, Writer as RefFlatWriter,
                      RefFlatRecordsStream, RefFlatTranscriptsStream, RefFlatGenesStream};
 
 mod io_gff;
-pub use io_gff::{Reader as GffReader,
-                 GffError, GffGenesStream, GffTranscripts};
+pub use io_gff::{Reader as GffReader, GffError, GffTranscripts};
 
 
 quick_error! {

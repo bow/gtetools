@@ -2,18 +2,16 @@ use std::cmp::{max, min};
 use std::convert::AsRef;
 use std::error::Error;
 use std::io;
-use std::iter::Filter;
 use std::fs;
 use std::path::Path;
 use std::vec;
 
 use bio::io::gff::{self, GffType};
 use itertools::{GroupBy, Group, Itertools};
-use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 use regex::Regex;
 
-use {Coord, Exon, ExonFeatureKind as EFK, Gene, GBuilder, Strand, TBuilder, Transcript,
+use {Coord, Exon, ExonFeatureKind as EFK, Gene, Strand, TBuilder, Transcript,
      RawTrxCoords};
 use consts::*;
 use utils::OptionDeref;
@@ -90,14 +88,6 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    pub fn genes_stream(&mut self) -> GffGenesStream<R> {
-        GffGenesStream {
-            inner: self.records_stream()
-                .filter(GffGenesStream::<R>::gene_filter_func as GxFilterFunc)
-                .group_by(GffGenesStream::<R>::gene_group_func),
-        }
-    }
-
     pub fn transcripts<'a>(
         &mut self,
         gene_id_attr: Option<&'a str>,
@@ -142,12 +132,6 @@ impl<R: io::Read> Reader<R> {
         })
     }
 
-    pub(crate) fn records_stream(&mut self) -> GffRecords<R> {
-        GffRecords {
-            inner: self.inner.records()
-        }
-    }
-
     pub(crate) fn raw_rows_stream(&mut self) -> GffRawRows<R> {
         GffRawRows {
             inner: self.inner.raw_rows()
@@ -158,20 +142,6 @@ impl<R: io::Read> Reader<R> {
 impl Reader<fs::File> {
     pub fn from_file<P: AsRef<Path>>(path: P, gff_type: GffType) -> io::Result<Self> {
         fs::File::open(path).map(|file| Reader::from_reader(file, gff_type))
-    }
-}
-
-pub(crate) struct GffRecords<'a, R: 'a> where R: io::Read {
-    inner: gff::Records<'a, R>,
-}
-
-impl<'a, R> Iterator for GffRecords<'a, R> where R: io::Read {
-
-    type Item = ::Result<gff::Record>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-            .map(|row| row.map_err(|e| ::Error::from(GffError::from(e))))
     }
 }
 
@@ -188,114 +158,6 @@ impl<'a, R> Iterator for GffRawRows<'a, R> where R: io::Read {
             .map(|row| row.map_err(|e| ::Error::from(GffError::from(e))))
     }
 }
-
-pub struct GffGenesStream<'a, R: 'a> where R: io::Read, {
-    inner: GroupBy<GxGroupKey, GxRecords<'a, R>, GxGroupFunc>,
-}
-
-type GxFilterFunc = fn(&::Result<gff::Record>) -> bool;
-
-type GxRecords<'a, R> = Filter<GffRecords<'a, R>, GxFilterFunc>;
-
-type GxGroupKey = Option<(String, String, Strand)>;
-
-type GxGroupFunc = fn(&::Result<gff::Record>) -> GxGroupKey;
-
-type GxGroupedRecs<'a, 'b, R> = Group<'b, GxGroupKey, GxRecords<'a, R>, GxGroupFunc>;
-
-impl<'a, R> GffGenesStream<'a, R> where R: io::Read {
-
-    fn gene_filter_func(result: &::Result<gff::Record>) -> bool {
-        match result {
-            &Ok(ref rec) => rec.attributes().contains_key(GENE_ID_STR),
-            &Err(_) => true,  // Err(_) is supposed to be handled elsewhere
-        }
-    }
-
-    fn gene_group_func(result: &::Result<gff::Record>) -> GxGroupKey {
-        result.as_ref().ok()
-            .map(|res| {
-                let gene_id = res.attributes().get(GENE_ID_STR)
-                    .expect("'gene_id' attribute not found")
-                    .clone();
-                let seq_name = res.seqname().to_owned();
-                let strand = res.strand();
-
-                (seq_name, gene_id, strand)
-            })
-    }
-
-    fn group_to_gene<'b>(group: (GxGroupKey, GxGroupedRecs<'a, 'b, R>)) -> ::Result<Gene> {
-        let (group_key, records) = group;
-        match group_key {
-
-            None => Err(records.filter_map(|x| x.err()).next().unwrap()),
-
-            // TODO: Create features of the parsed records instead of just capturing coordinates.
-            Some((seq_name, gid, strand)) => {
-
-                let mut gene_coord = INIT_COORD;
-                let mut trx_coords: LinkedHashMap<String, RawTrxCoord> = LinkedHashMap::new();
-
-                for record in records {
-
-                    let mut rec = record?;
-                    rec.attributes_mut().remove(GENE_ID_STR);
-
-                    let rtrx_entry = rec.attributes_mut()
-                        .remove(TRANSCRIPT_ID_STR)
-                        .ok_or(GffError::MissingTranscriptId)
-                        .and_then(|mut ids| {
-                            if ids.len() > 1 {
-                                Err(GffError::MultipleTranscriptIds)
-                            } else {
-                                Ok(ids.pop().unwrap())
-                            }
-                        })
-                        .map(|id| trx_coords.entry(id).or_insert((INIT_COORD, vec![], None)));
-
-                    match rec.feature_type() {
-                        Some(GENE_STR) => {
-                            gene_coord = adjust_coord(gene_coord, &rec);
-                        },
-                        Some(TRANSCRIPT_STR) => {
-                            let trx_entry = rtrx_entry?;
-                            trx_entry.0 = adjust_coord(trx_entry.0, &rec);
-                        },
-                        Some(EXON_STR) => {
-                            let trx_entry = rtrx_entry?;
-                            (trx_entry.1).push((rec.start(), rec.end()));
-                        },
-                        Some(CDS_STR) => {
-                            let trx_entry = rtrx_entry?;
-                            trx_entry.2 = (trx_entry.2).or(Some(INIT_COORD))
-                                .map(|coord| adjust_coord(coord, &rec));
-                        },
-                        _ => {},
-                    }
-                }
-
-                GBuilder::new(seq_name, gene_coord.0, gene_coord.1)
-                    .id(gid)
-                    .strand(strand)
-                    .transcript_coords(trx_coords)
-                    .transcript_coding_incl_stop(false)
-                    .build()
-            },
-        }
-    }
-}
-
-impl<'a, R> Iterator for GffGenesStream<'a, R> where R: io::Read {
-
-    type Item = ::Result<Gene>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.into_iter().map(Self::group_to_gene).next()
-            .map(|res| res.map_err(::Error::from))
-    }
-}
-
 
 #[derive(Debug, PartialEq)]
 struct TrxPart {
@@ -396,7 +258,7 @@ impl TrxCoords {
     }
 
     fn resolve<'a>(
-        mut self,
+        self,
         strand: Strand,
         loose_codons: bool,
         tid: Option<&'a str>
@@ -505,9 +367,6 @@ impl Iterator for GffTranscripts {
 
         self.groups.into_iter().map(group_to_transcript).next()
     }
-}
-
-    loose_codons: bool,
 }
 
 fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> ::Result<Regex> {
@@ -674,12 +533,6 @@ impl Exon {
 
         Ok(recs)
     }
-}
-
-#[inline(always)]
-fn adjust_coord(cur_coord: Coord<u64>, record: &gff::Record) -> Coord<u64> {
-    (min(cur_coord.0, record.start()),
-     max(cur_coord.1, record.end()))
 }
 
 #[inline(always)]
