@@ -16,7 +16,7 @@ use csv::Error as CsvError;
 use regex::Error as RegexError;
 
 mod model;
-pub use model::{Feature, FeatureError, FeatureKind,
+pub use model::{Feature, ModelError, FeatureKind,
                 EBuilder, Exon, ExonFeature, ExonFeatureKind,
                 TBuilder, Transcript, TranscriptFeature, TranscriptFeatureKind,
                 GBuilder, Gene, GeneFeature, GeneFeatureKind};
@@ -33,7 +33,7 @@ pub use io_gff::{Reader as GffReader, GffError, GffTranscripts};
 quick_error! {
     #[derive(Debug)]
     pub enum Error {
-        Feature(err: FeatureError) {
+        Model(err: ModelError) {
             description(err.description())
             display("{}", err)
             from()

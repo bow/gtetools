@@ -199,7 +199,7 @@ impl Exon {
         self.features.as_mut_slice()
     }
 
-    pub fn set_features(&mut self, features: Vec<ExonFeature>) -> Result<(), FeatureError> {
+    pub fn set_features(&mut self, features: Vec<ExonFeature>) -> Result<(), ModelError> {
         let (new_start, new_end) = features.iter()
             .fold(consts::INIT_COORD,
                   |acc, x| (min(acc.0, x.start()),
@@ -301,9 +301,9 @@ impl EBuilder {
 
     pub fn build(self) -> ::Result<Exon> {
         let interval = coord_to_interval(self.start, self.end)
-            .map_err(::Error::Feature)?;
+            .map_err(::Error::Model)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
-            .map_err(::Error::Feature)?;
+            .map_err(::Error::Model)?;
         let feature = Exon {
             seq_name: self.seq_name,
             interval: interval,
@@ -560,14 +560,14 @@ impl TBuilder {
 
     pub fn build(self) -> ::Result<Transcript> {
         let interval = coord_to_interval(self.start, self.end)
-            .map_err(::Error::Feature)?;
+            .map_err(::Error::Model)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
-            .map_err(::Error::Feature)?;
+            .map_err(::Error::Model)?;
         let exons = resolve_exons_input(
             &self.seq_name, &interval, &strand, self.id.as_deref(),
             self.gene_id.as_deref(), None, // TODO: allow for exon IDs here
             self.exons, self.exon_coords.as_ref(), self.coding_coord,
-            self.coding_incl_stop).map_err(::Error::Feature)?;
+            self.coding_incl_stop).map_err(::Error::Model)?;
 
         let transcript = Transcript {
             seq_name: self.seq_name,
@@ -692,9 +692,9 @@ impl GBuilder {
 
     pub fn build(self) -> ::Result<Gene> {
         let interval = coord_to_interval(self.start, self.end)
-            .map_err(::Error::Feature)?;
+            .map_err(::Error::Model)?;
         let strand = resolve_strand_input(self.strand, self.strand_char)
-            .map_err(::Error::Feature)?;
+            .map_err(::Error::Model)?;
         let transcripts = resolve_transcripts_input(
             &self.seq_name, &interval, &strand, self.id.as_deref(),
             self.transcripts, self.transcript_coords, self.transcript_coding_incl_stop)?;
@@ -713,7 +713,7 @@ impl GBuilder {
 
 quick_error! {
     #[derive(Debug)]
-    pub enum FeatureError {
+    pub enum ModelError {
         InvalidInterval(err: bio_utils::IntervalError) {
             description(
                 match err {
@@ -785,18 +785,18 @@ quick_error! {
 fn resolve_strand_input(
     strand: Option<Strand>,
     strand_char: Option<char>)
--> Result<Strand, FeatureError>
+-> Result<Strand, ModelError>
 {
     match (strand, strand_char) {
-        (None, None) => Err(FeatureError::UnspecifiedStrand),
+        (None, None) => Err(ModelError::UnspecifiedStrand),
         (Some(sv), None) => Ok(sv),
-        (None, Some(ref scv)) => Strand::from_char(scv).map_err(FeatureError::from),
+        (None, Some(ref scv)) => Strand::from_char(scv).map_err(ModelError::from),
         (Some(sv), Some(ref scv)) => {
-            let sv_from_char = Strand::from_char(scv).map_err(FeatureError::from)?;
+            let sv_from_char = Strand::from_char(scv).map_err(ModelError::from)?;
             if sv == sv_from_char {
                 Ok(sv)
             } else {
-                Err(FeatureError::ConflictingStrand)
+                Err(ModelError::ConflictingStrand)
             }
         }
     }
@@ -813,7 +813,7 @@ fn resolve_exons_input(
     exon_coords: Option<&Vec<Coord<u64>>>,
     coding_coord: Option<Coord<u64>>,
     coding_incl_stop: bool
-) -> Result<Vec<Exon>, FeatureError>
+) -> Result<Vec<Exon>, ModelError>
 {
     match (exons, exon_coords, coding_coord) {
         // nothing defined -> the transcript doesn't have any known exons
@@ -821,7 +821,7 @@ fn resolve_exons_input(
 
         // only CDS defined -> must be an error
         (None, None, Some(_)) => Err(
-            FeatureError::UnspecifiedExons(transcript_id.map(|tid| tid.to_owned()))),
+            ModelError::UnspecifiedExons(transcript_id.map(|tid| tid.to_owned()))),
 
         // features defined ~ takes precedence over coords (GTF input, since we need
         // to construct the tx features first to store its annotations)
@@ -859,7 +859,7 @@ fn resolve_transcripts_input(
 
                 if trx_coord.0 < gene_interval.start || trx_coord.1 > gene_interval.end {
                     let tid = Some(trx_id);
-                    return Err(::Error::Feature(FeatureError::TranscriptNotFullyEnveloped(tid)));
+                    return Err(::Error::Model(ModelError::TranscriptNotFullyEnveloped(tid)));
                 }
 
                 let btrx = TBuilder::new(gene_seqname.clone(), trx_coord.0, trx_coord.1)
@@ -890,19 +890,19 @@ fn infer_exons(
     exon_coords: &Vec<Coord<u64>>,
     coding_coord: Option<Coord<u64>>,
     coding_incl_stop: bool
-) -> Result<Vec<Exon>, FeatureError>
+) -> Result<Vec<Exon>, ModelError>
 {
 
     let tid = transcript_id.map(|id| id.to_owned());
 
     if exon_coords.len() == 0 {
-        return Err(FeatureError::UnspecifiedExons(tid));
+        return Err(ModelError::UnspecifiedExons(tid));
     }
 
     let mut m_exon_coords = Vec::with_capacity(exon_coords.len());
     for &(a, b) in exon_coords.iter() {
         if a >= b {
-            return Err(FeatureError::InvalidExonInterval(tid))
+            return Err(ModelError::InvalidExonInterval(tid))
         }
         m_exon_coords.push((a, b));
     }
@@ -920,7 +920,7 @@ fn infer_exons(
     let exon_r = (m_exon_coords.first().unwrap().0, m_exon_coords.last().unwrap().1);
 
     if exon_r.0 != transcript_interval.start || exon_r.1 != transcript_interval.end {
-        return Err(FeatureError::UnmatchedExons(tid));
+        return Err(ModelError::UnmatchedExons(tid));
     }
 
     match adj_coding_coord {
@@ -928,11 +928,11 @@ fn infer_exons(
         Some(coding_r) => {
             // Improper coding region is an error
             if coding_r.0 >= coding_r.1 {
-                return Err(FeatureError::InvalidCodingInterval(tid));
+                return Err(ModelError::InvalidCodingInterval(tid));
             }
             // Coding coord must be fully enveloped by exon max-min
             if coding_r.0 < exon_r.0 || coding_r.1 > exon_r.1 {
-                return Err(FeatureError::CodingNotFullyEnveloped(tid));
+                return Err(ModelError::CodingNotFullyEnveloped(tid));
             }
             // Coding start and end must be in exons
             let cine = m_exon_coords.iter()
@@ -941,7 +941,7 @@ fn infer_exons(
                      acc.1 || (c.0 <= coding_r.1 && coding_r.1 <= c.1))
                 });
             if !cine.0 || !cine.1 {
-                return Err(FeatureError::CodingInIntron(tid));
+                return Err(ModelError::CodingInIntron(tid));
             }
             // There must be room for stop codons (which is not inclusive in coding_coord)
             let stop_codon_ok = match transcript_strand {
@@ -951,7 +951,7 @@ fn infer_exons(
                     coding_r.0 - 3 >= exon_r.0 && coding_r.1 + 3 <= exon_r.1,
             };
             if !stop_codon_ok {
-                return Err(FeatureError::CodingTooLarge(tid));
+                return Err(ModelError::CodingTooLarge(tid));
             }
             infer_exon_features(&m_exon_coords, coding_r, &transcript_seqname, transcript_strand,
                                 transcript_id, gene_id, exon_id)
@@ -1014,8 +1014,8 @@ fn adjust_coding_coord(mut start: u64, mut end: u64,
 }
 
 #[inline(always)]
-fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
-    Interval::new(start..end).map_err(FeatureError::from)
+fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, ModelError> {
+    Interval::new(start..end).map_err(ModelError::from)
 }
 
 // requirements:
@@ -1030,7 +1030,7 @@ fn infer_exon_features(
     transcript_id: Option<&str>,
     gene_id: Option<&str>,
     exon_id: Option<&str>,
-) -> Result<Vec<Exon>, FeatureError> {
+) -> Result<Vec<Exon>, ModelError> {
 
     let mut exons: Vec<Exon> = Vec::with_capacity(exon_coords.len() * 2 + 4);
     let (utr1, utr2) = match transcript_strand {
@@ -1114,7 +1114,7 @@ fn infer_exon_features(
             } else if end == coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // a coding region must have at least 3 bases for the start codon
-                    return Err(FeatureError::CodingTooSmall(tid));
+                    return Err(ModelError::CodingTooSmall(tid));
                 }
                 match transcript_strand {
                     &Strand::Forward => {
@@ -1147,7 +1147,7 @@ fn infer_exon_features(
             } else if end > coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::CodingTooSmall(tid));
+                    return Err(ModelError::CodingTooSmall(tid));
                 }
                 match transcript_strand {
                     &Strand::Forward => {
@@ -1213,7 +1213,7 @@ fn infer_exon_features(
             } else if end == coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::CodingTooSmall(tid));
+                    return Err(ModelError::CodingTooSmall(tid));
                 }
                 let mut exon = exn(start, end, vec![]);
                 match transcript_strand {
@@ -1238,7 +1238,7 @@ fn infer_exon_features(
             } else if end > coding_r.1 {
                 if coding_r.1 - coding_r.0 < 3 {
                     // coding region must have at least 3 bases
-                    return Err(FeatureError::CodingTooSmall(tid));
+                    return Err(ModelError::CodingTooSmall(tid));
                 }
                 let mut exon = exn(start, end, vec![]);
                 match transcript_strand {

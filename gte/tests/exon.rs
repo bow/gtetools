@@ -7,8 +7,8 @@ extern crate gte;
 use bio::utils::{self, Interval, Strand};
 use multimap::MultiMap;
 
-use gte::{EBuilder, ExonFeature, ExonFeatureKind, FeatureError, Error};
-use FeatureError::{InvalidInterval, InvalidStrandChar};
+use gte::{EBuilder, ExonFeature, ExonFeatureKind, ModelError, Error};
+use ModelError::{InvalidInterval, InvalidStrandChar};
 use ExonFeatureKind::*;
 
 fn make_feat(start: u64, end: u64, kind: ExonFeatureKind) -> ExonFeature {
@@ -59,14 +59,14 @@ fn ebuilder_interval_invalid() {
     let exonb = EBuilder::new("chrE", 20, 10).build();
     assert!(exonb.is_err());
     assert!(matches!(exonb.unwrap_err(),
-                     Error::Feature(InvalidInterval(utils::IntervalError::InvalidRange))));
+                     Error::Model(InvalidInterval(utils::IntervalError::InvalidRange))));
 }
 
 #[test]
 fn ebuilder_strand_unspecified() {
     let exonb = EBuilder::new("chrT", 20, 30).build();
     assert!(exonb.is_err());
-    assert!(matches!(exonb.unwrap_err(), Error::Feature(FeatureError::UnspecifiedStrand)));
+    assert!(matches!(exonb.unwrap_err(), Error::Model(ModelError::UnspecifiedStrand)));
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn ebuilder_strand_char_unexpected() {
         .build();
     assert!(exonb.is_err());
     assert!(matches!(exonb.unwrap_err(),
-                     Error::Feature(InvalidStrandChar(utils::StrandError::InvalidChar(_)))));
+                     Error::Model(InvalidStrandChar(utils::StrandError::InvalidChar(_)))));
 }
 
 #[test]
