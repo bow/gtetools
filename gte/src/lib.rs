@@ -7,7 +7,6 @@ extern crate multimap;
 extern crate quick_error;
 extern crate regex;
 
-use std::io::Error as StdIoError;
 use std::num::{ParseFloatError, ParseIntError};
 
 pub use bio::utils::Strand;
@@ -57,11 +56,6 @@ quick_error! {
             cause(err)
         }
         Csv(err: CsvError) {
-            description(err.description())
-            from()
-            cause(err)
-        }
-        Io(err: StdIoError) {
             description(err.description())
             from()
             cause(err)

@@ -455,8 +455,8 @@ impl Transcript {
 
 impl Writer<fs::File> {
 
-    pub fn from_file<P: AsRef<Path>>(path: P) -> ::Result<Self> {
-        let f = fs::File::create(path).map_err(::Error::from)?;
+    pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let f = fs::File::create(path)?;
         Ok(Writer::from_writer(f))
     }
 }
