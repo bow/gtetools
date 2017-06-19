@@ -226,6 +226,8 @@ impl RefFlatRecord {
 
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>,
+    contig_prefix: Option<String>,
+    contig_lstrip: Option<String>,
 }
 
 impl<R: io::Read> Reader<R> {
@@ -234,46 +236,44 @@ impl<R: io::Read> Reader<R> {
         Reader {
             inner: csv::Reader::from_reader(in_reader)
                 .delimiter(b'\t')
-                .has_headers(false)
+                .has_headers(false),
+            contig_prefix: None,
+            contig_lstrip: None,
         }
     }
 
-    pub fn records_stream<'a, T>(
-        &'a mut self,
-        contig_prefix: Option<T>,
-        contig_lstrip: Option<T>,
-    ) -> RefFlatRecordsStream<'a, R>
+    pub fn contig_prefix<T>(&mut self, prefix: T) -> &mut Self
         where T: Into<String>
     {
+        self.contig_prefix = Some(prefix.into());
+        self
+    }
+
+    pub fn contig_lstrip<T>(&mut self, lstrip: T) -> &mut Self
+        where T: Into<String>
+    {
+        self.contig_lstrip = Some(lstrip.into());
+        self
+    }
+
+    pub fn records_stream(&mut self) -> RefFlatRecordsStream<R> {
         RefFlatRecordsStream {
             inner: self.inner.decode(),
-            contig_prefix: contig_prefix.map(|v| v.into()),
-            contig_lstrip: contig_lstrip.map(|v| v.into()),
+            contig_prefix: self.contig_prefix.as_deref(),
+            contig_lstrip: self.contig_lstrip.as_deref(),
         }
     }
 
-    pub fn transcripts_stream<'a, T>(
-        &'a mut self,
-        contig_prefix: Option<T>,
-        contig_lstrip: Option<T>,
-    ) -> RefFlatTranscriptsStream<'a, R>
-        where T: Into<String>
-    {
+    pub fn transcripts_stream(&mut self) -> RefFlatTranscriptsStream<R> {
         RefFlatTranscriptsStream {
-            inner: self.records_stream(contig_prefix, contig_lstrip)
+            inner: self.records_stream()
         }
     }
 
-    pub fn genes_stream<'a, T>(
-        &'a mut self,
-        contig_prefix: Option<T>,
-        contig_lstrip: Option<T>,
-    ) -> RefFlatGenesStream<'a, R>
-        where T: Into<String>
-    {
+    pub fn genes_stream(&mut self) -> RefFlatGenesStream<R> {
         RefFlatGenesStream {
-            inner: self.records_stream(contig_prefix, contig_lstrip)
-                .group_by(RefFlatGenesStream::<'a, R>::group_func),
+            inner: self.records_stream()
+                .group_by(RefFlatGenesStream::<R>::group_func),
         }
     }
 }
@@ -286,8 +286,8 @@ impl Reader<fs::File> {
 
 pub struct RefFlatRecordsStream<'a, R: 'a> where R: io::Read {
     inner: csv::DecodedRecords<'a, R, RefFlatRow>,
-    contig_prefix: Option<String>,
-    contig_lstrip: Option<String>,
+    contig_prefix: Option<&'a str>,
+    contig_lstrip: Option<&'a str>,
 }
 
 impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
@@ -295,8 +295,8 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
     type Item = ::Result<RefFlatRecord>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let lstrip = self.contig_lstrip.as_ref().map(|v| (v.as_str(), v.len()));
-        let prefix = self.contig_prefix.as_deref();
+        let lstrip = self.contig_lstrip.map(|v| (v, v.len()));
+        let prefix = self.contig_prefix;
         self.inner.next()
             .map(|row| {
                 row

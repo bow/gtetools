@@ -32,8 +32,7 @@ fn next_gx<'a, R>(rg: &mut RefFlatGenesStream<'a, R>) -> Gene where R: io::Read 
 #[test]
 fn refflat_reader_records_single_row_no_cds() {
     let mut reader = RefFlatReader::from_reader(SINGLE_ROW_NO_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut records = reader.records_stream(cpre, clstr);
+    let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
     assert_eq!(rec1.gene_id(), "DDX11L1");
@@ -44,8 +43,7 @@ fn refflat_reader_records_single_row_no_cds() {
 #[test]
 fn refflat_reader_transcripts_single_row_no_cds() {
     let mut reader = RefFlatReader::from_reader(SINGLE_ROW_NO_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut transcripts = reader.transcripts_stream(cpre, clstr);
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.id(), Some("NR_046018"));
@@ -56,8 +54,7 @@ fn refflat_reader_transcripts_single_row_no_cds() {
 #[test]
 fn refflat_reader_genes_single_row_no_cds() {
     let mut reader = RefFlatReader::from_reader(SINGLE_ROW_NO_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut genes = reader.genes_stream(cpre, clstr);
+    let mut genes = reader.genes_stream();
 
     let gx1 = next_gx(&mut genes);
     assert_eq!(gx1.id(), Some("DDX11L1"));
@@ -68,8 +65,7 @@ fn refflat_reader_genes_single_row_no_cds() {
 #[test]
 fn refflat_reader_records_mult_rows_no_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_NO_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut records = reader.records_stream(cpre, clstr);
+    let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
     assert_eq!(rec1.gene_id(), "DDX11L1");
@@ -83,8 +79,7 @@ fn refflat_reader_records_mult_rows_no_cds() {
 #[test]
 fn refflat_reader_transcripts_mult_rows_no_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_NO_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut transcripts = reader.transcripts_stream(cpre, clstr);
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.id(), Some("NR_046018"));
@@ -98,8 +93,7 @@ fn refflat_reader_transcripts_mult_rows_no_cds() {
 #[test]
 fn refflat_reader_genes_mult_rows_no_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_NO_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut genes = reader.genes_stream(cpre, clstr);
+    let mut genes = reader.genes_stream();
 
     let gx1 = next_gx(&mut genes);
     assert_eq!(gx1.id(), Some("DDX11L1"));
@@ -113,8 +107,7 @@ fn refflat_reader_genes_mult_rows_no_cds() {
 #[test]
 fn refflat_reader_records_mult_rows_mult_genes_with_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_MULT_GENES_WITH_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut records = reader.records_stream(cpre, clstr);
+    let mut records = reader.records_stream();
 
     let rec1 = next_rec(&mut records);
     assert_eq!(rec1.transcript_id(), "NM_001297605");
@@ -132,8 +125,7 @@ fn refflat_reader_records_mult_rows_mult_genes_with_cds() {
 #[test]
 fn refflat_reader_transcripts_mult_rows_mult_genes_with_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_MULT_GENES_WITH_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut transcripts = reader.transcripts_stream(cpre, clstr);
+    let mut transcripts = reader.transcripts_stream();
 
     let trx1 = next_trx(&mut transcripts);
     assert_eq!(trx1.id(), Some("NM_001297605"));
@@ -151,8 +143,7 @@ fn refflat_reader_transcripts_mult_rows_mult_genes_with_cds() {
 #[test]
 fn refflat_reader_genes_mult_rows_mult_genes_with_cds() {
     let mut reader = RefFlatReader::from_reader(MULT_ROWS_MULT_GENES_WITH_CDS.as_bytes());
-    let (cpre, clstr): (Option<String>, Option<String>) = (None, None);
-    let mut genes = reader.genes_stream(cpre, clstr);
+    let mut genes = reader.genes_stream();
 
     let gx1 = next_gx(&mut genes);
     assert_eq!(gx1.id(), Some("TNFRSF14"));
