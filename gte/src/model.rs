@@ -9,7 +9,7 @@ use multimap::MultiMap;
 
 use {Coord, RawTrxCoords, consts};
 use consts::DEF_ID;
-use utils::{OptionDeref, coord_to_interval};
+use utils::OptionDeref;
 
 use self::ExonFeatureKind::*;
 
@@ -1011,6 +1011,11 @@ fn adjust_coding_coord(mut start: u64, mut end: u64,
         &Strand::Unknown => {},
     }
     Some((start, end))
+}
+
+#[inline(always)]
+fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, FeatureError> {
+    Interval::new(start..end).map_err(FeatureError::from)
 }
 
 // requirements:
