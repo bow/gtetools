@@ -238,21 +238,42 @@ impl<R: io::Read> Reader<R> {
         }
     }
 
-    pub fn records_stream<'a>(&'a mut self) -> RefFlatRecordsStream<'a, R> {
+    pub fn records_stream<'a, T>(
+        &'a mut self,
+        contig_prefix: Option<T>,
+        contig_lstrip: Option<T>,
+    ) -> RefFlatRecordsStream<'a, R>
+        where T: Into<String>
+    {
         RefFlatRecordsStream {
-            inner: self.inner.decode()
+            inner: self.inner.decode(),
+            contig_prefix: contig_prefix.map(|v| v.into()),
+            contig_lstrip: contig_lstrip.map(|v| v.into()),
         }
     }
 
-    pub fn transcripts_stream<'a>(&'a mut self) -> RefFlatTranscriptsStream<'a, R> {
+    pub fn transcripts_stream<'a, T>(
+        &'a mut self,
+        contig_prefix: Option<T>,
+        contig_lstrip: Option<T>,
+    ) -> RefFlatTranscriptsStream<'a, R>
+        where T: Into<String>
+    {
         RefFlatTranscriptsStream {
-            inner: self.records_stream()
+            inner: self.records_stream(contig_prefix, contig_lstrip)
         }
     }
 
-    pub fn genes_stream<'a>(&'a mut self) -> RefFlatGenesStream<'a, R> {
+    pub fn genes_stream<'a, T>(
+        &'a mut self,
+        contig_prefix: Option<T>,
+        contig_lstrip: Option<T>,
+    ) -> RefFlatGenesStream<'a, R>
+        where T: Into<String>
+    {
         RefFlatGenesStream {
-            inner: self.records_stream().group_by(RefFlatGenesStream::<'a, R>::group_func),
+            inner: self.records_stream(contig_prefix, contig_lstrip)
+                .group_by(RefFlatGenesStream::<'a, R>::group_func),
         }
     }
 }
@@ -265,6 +286,8 @@ impl Reader<fs::File> {
 
 pub struct RefFlatRecordsStream<'a, R: 'a> where R: io::Read {
     inner: csv::DecodedRecords<'a, R, RefFlatRow>,
+    contig_prefix: Option<String>,
+    contig_lstrip: Option<String>,
 }
 
 impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
@@ -272,9 +295,22 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
     type Item = ::Result<RefFlatRecord>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let lstrip = self.contig_lstrip.as_ref().map(|v| (v.as_str(), v.len()));
         self.inner.next()
             .map(|row| {
-                row.or_else(|err| Err(::Error::from(err)))
+                row
+                    .or_else(|err| Err(::Error::from(err)))
+                    .map(|mut row| {
+                        if let Some(ref pre) = self.contig_prefix.as_ref() {
+                            row.2 = format!("{}{}", pre, row.2);
+                        }
+                        if let Some((ref lstr, lstr_len)) = lstrip {
+                            if row.2.starts_with(lstr) {
+                                let _ = row.2.drain(..lstr_len);
+                            }
+                        }
+                        row
+                    })
                     .and_then(RefFlatRecord::try_from_row)
             })
     }
