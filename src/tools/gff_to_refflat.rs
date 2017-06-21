@@ -73,15 +73,17 @@ pub fn run(args: &ArgMatches) -> ::Result<()> {
     let mut reader = utils::resolve_reader(args.value_of("input").unwrap())
         .map(|r| GffReader::from_reader(r, gff_type))?;
 
+    reader
+        .gene_id_attr(args.value_of("gene_id_attr").unwrap())
+        .transcript_id_attr(args.value_of("transcript_id_attr").unwrap())
+        .contig_prefix(args.value_of("seq_prefix"))
+        .contig_lstrip(args.value_of("seq_lstrip"))
+        .loose_codons(args.is_present("loose_codons"));
+
     let mut writer = utils::resolve_writer(args.value_of("output").unwrap())
         .map(|w| RefFlatWriter::from_writer(w))?;
 
-    let rtrxs = reader.transcripts(
-        args.value_of("gene_id_attr"), args.value_of("transcript_id_attr"),
-        args.value_of("seq_prefix"), args.value_of("seq_lstrip"),
-        args.is_present("loose_codons"))?;
-
-    for result in rtrxs {
+    for result in reader.transcripts()? {
         let wresult = result
             .and_then(|ref trx| writer.write_transcript(trx));
         if let Err(e) = wresult {

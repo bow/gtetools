@@ -76,6 +76,11 @@ quick_error! {
 
 pub struct Reader<R: io::Read> {
     inner: gff::Reader<R>,
+    gene_id_attr: String,
+    transcript_id_attr: String,
+    contig_prefix: Option<String>,
+    contig_lstrip: Option<String>,
+    loose_codons: bool,
     pub(crate) gff_type: GffType,
 }
 
@@ -84,30 +89,59 @@ impl<R: io::Read> Reader<R> {
     pub fn from_reader(in_reader: R, gff_type: GffType) -> Reader<R> {
         Reader {
             inner: gff::Reader::new(in_reader, gff_type),
+            gene_id_attr: GENE_ID_STR.to_owned(),
+            transcript_id_attr: TRANSCRIPT_ID_STR.to_owned(),
+            contig_prefix: None,
+            contig_lstrip: None,
+            loose_codons: false,
             gff_type: gff_type.clone(),
         }
     }
 
-    pub fn transcripts<'a>(
-        &mut self,
-        gene_id_attr: Option<&'a str>,
-        transcript_id_attr: Option<&'a str>,
-        contig_prefix: Option<&'a str>,
-        contig_lstrip: Option<&'a str>,
-        loose_codons: bool,
-    ) -> ::Result<GffTranscripts> {
+    pub fn gene_id_attr<T>(&mut self, gene_id_attr: T) -> &mut Self
+        where T: Into<String>
+    {
+        self.gene_id_attr = gene_id_attr.into();
+        self
+    }
 
-        let gid_regex = make_gff_id_regex(
-            gene_id_attr.unwrap_or(GENE_ID_STR), self.gff_type)?;
-        let tid_regex = make_gff_id_regex(
-            transcript_id_attr.unwrap_or(TRANSCRIPT_ID_STR), self.gff_type)?;
+    pub fn transcript_id_attr<T>(&mut self, transcript_id_attr: T) -> &mut Self
+        where T: Into<String>
+    {
+        self.transcript_id_attr = transcript_id_attr.into();
+        self
+    }
 
-        let lstrip = contig_lstrip.map(|v| (v, v.len()));
+    pub fn contig_prefix<T>(&mut self, prefix: Option<T>) -> &mut Self
+        where T: Into<String>
+    {
+        self.contig_prefix = prefix.map(|v| v.into());
+        self
+    }
+
+    pub fn contig_lstrip<T>(&mut self, lstrip: Option<T>) -> &mut Self
+        where T: Into<String>
+    {
+        self.contig_lstrip = lstrip.map(|v| v.into());
+        self
+    }
+
+    pub fn loose_codons(&mut self, loose_codons: bool) -> &mut Self {
+        self.loose_codons = loose_codons;
+        self
+    }
+
+    pub fn transcripts(&mut self) -> ::Result<GffTranscripts> {
+
+        let gid_regex = make_gff_id_regex(self.gene_id_attr.as_str(), self.gff_type)?;
+        let tid_regex = make_gff_id_regex(self.transcript_id_attr.as_str(), self.gff_type)?;
+        let prefix = self.contig_prefix.clone();
+        let lstrip = self.contig_lstrip.clone();
 
         let mut parts = Vec::new();
         for result in self.raw_rows_stream() {
             let mut row = result.map_err(::Error::from)?;
-            update_contig(&mut row.0, contig_prefix, lstrip);
+            update_contig(&mut row.0, prefix.as_deref(), lstrip.as_deref().map(|v| (v, v.len())));
             match row.2.as_str() {
                 TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
                     let rf = TrxPart::try_from_row(row, &gid_regex, &tid_regex)
@@ -121,7 +155,7 @@ impl<R: io::Read> Reader<R> {
 
         Ok(GffTranscripts {
             groups: parts.into_iter().group_by(TrxPart::transcript_group_key),
-            loose_codons: loose_codons,
+            loose_codons: self.loose_codons,
         })
     }
 
