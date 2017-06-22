@@ -12,7 +12,7 @@ static SINGLE_GENE_GTF: &'static str = include_str!("data/single_gene.gtf");
 #[test]
 fn gtf_reader_multiple_transcripts() {
     let mut reader = GffReader::from_reader(SINGLE_GENE_GTF.as_bytes(), GffType::GTF2);
-    let mut transcripts = reader.transcripts(None, None, None, None, false).expect("transcripts");
+    let mut transcripts = reader.transcripts().expect("transcripts");
 
     let trx1 = transcripts.next().expect("a transcript result").expect("a transcript");
     assert_eq!(trx1.seq_name(), "chr2");
