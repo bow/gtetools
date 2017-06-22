@@ -37,6 +37,11 @@ quick_error! {
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
         }
+        DuplicateTranscriptId(gid: Option<String>) {
+            description("gene has multiple transcripts with the same identifier")
+            display(self_) -> ("{}, gene ID: {}",
+                               self_.description(), gid.as_deref().unwrap_or(consts::DEF_ID))
+        }
         MissingGeneId {
             description("gene identifier attribute not found")
         }
@@ -356,7 +361,11 @@ impl<'a, R> RefFlatGenesStream<'a, R> where R: io::Read {
                     gene_end = max(gene_end, transcript.end());
                     let tid = transcript.id().map(|id| id.to_owned())
                         .ok_or(::Error::from(RefFlatError::MissingTranscriptId))?;
-                    transcripts.insert(tid, transcript);
+                    let existing_trx = transcripts.insert(tid, transcript);
+                    if existing_trx.is_some() {
+                        let err = RefFlatError::DuplicateTranscriptId(Some(gid));
+                        return Err(::Error::from(err));
+                    }
                 }
                 GBuilder::new(seq_name, gene_start, gene_end)
                     .id(gid)
