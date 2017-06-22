@@ -53,6 +53,7 @@ quick_error! {
 
 pub type RefFlatRow = (String, String, String, char, u64, u64, u64, u64, usize, String, String);
 
+#[derive(Debug)]
 pub struct RefFlatRecord {
     gene_id: String,
     transcript_id: String,

@@ -214,6 +214,7 @@ impl Exon {
     }
 }
 
+#[derive(Debug)]
 pub struct EBuilder {
     seq_name: String,
     start: u64,
@@ -460,6 +461,7 @@ impl Transcript {
 
 }
 
+#[derive(Debug)]
 pub struct TBuilder {
     seq_name: String,
     start: u64,
@@ -614,6 +616,7 @@ impl Gene {
     }
 }
 
+#[derive(Debug)]
 pub struct GBuilder {
     seq_name: String,
     start: u64,
@@ -714,7 +717,7 @@ impl GBuilder {
 quick_error! {
     #[derive(Debug)]
     pub enum ModelError {
-        InvalidInterval(err: bio_utils::IntervalError) {
+        InvalidInterval(err: IntervalError) {
             description(
                 match err {
                     &IntervalError::InvalidRange =>
@@ -873,7 +876,9 @@ fn resolve_transcripts_input(
                         .build()?,
                     None => btrx.build()?
                 };
-                trxs.insert(trx_id, trx);
+                // We do not expect any duplicate trx_id here, so the insert() operation
+                // result can be discarded.
+                let _ = trxs.insert(trx_id, trx);
             }
             Ok(trxs)
         },
@@ -1428,7 +1433,8 @@ where F: Fn(u64, u64, ExonFeatureKind) -> ExonFeature
         if let Some(fxp_start) = ofxp_start {
             let adj_fxp_end = fx.start();
             if fxp_start == adj_fxp_end {
-                exon.features.pop();
+                // We expect no overlapping result here, so we simply discard the last feature.
+                let _ = exon.features.pop();
             } else {
                 let n_fxs = exon.features.len();
                 let new_fxp_interval = Interval::new(fxp_start..adj_fxp_end).unwrap();
