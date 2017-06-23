@@ -14,8 +14,6 @@ extern crate multimap;
 extern crate quick_error;
 extern crate regex;
 
-use std::num::ParseFloatError;
-
 pub use bio::utils::Strand;
 pub use bio::io::gff::GffType;
 use csv::Error as CsvError;
@@ -63,11 +61,6 @@ quick_error! {
             cause(err)
         }
         Csv(err: CsvError) {
-            description(err.description())
-            from()
-            cause(err)
-        }
-        ParseFloat(err: ParseFloatError) {
             description(err.description())
             from()
             cause(err)
