@@ -17,7 +17,6 @@ extern crate regex;
 pub use bio::utils::Strand;
 pub use bio::io::gff::GffType;
 use csv::Error as CsvError;
-use regex::Error as RegexError;
 
 mod model;
 pub use model::{Feature, ModelError, FeatureKind,
@@ -52,11 +51,6 @@ quick_error! {
         Gff(err: GffError) {
             description(err.description())
             display("{}", err)
-            from()
-            cause(err)
-        }
-        Regex(err: RegexError) {
-            description(err.description())
             from()
             cause(err)
         }

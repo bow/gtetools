@@ -9,7 +9,7 @@ use std::vec;
 use bio::io::gff::{self, GffType};
 use itertools::{GroupBy, Group, Itertools};
 use multimap::MultiMap;
-use regex::Regex;
+use regex::{Error as RegexError, Regex};
 
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, Strand, TBuilder, Transcript,
      RawTrxCoords};
@@ -64,6 +64,11 @@ quick_error! {
         }
         UnsupportedGffType {
             description("unsupported gff type")
+        }
+        Regex(err: RegexError) {
+            description(err.description())
+            from()
+            cause(err)
         }
         Bio(err: gff::GffError) {
             description(err.description())
@@ -406,7 +411,8 @@ fn make_gff_id_regex(attr_name: &str, gff_type: GffType) -> ::Result<Regex> {
         let pat = format!(
             r#"{attr_name}{delim}{nest}(?P<value>[^{delim}{term}\t]+){nest}{term}?"#,
             attr_name=attr_name, delim=delim, term=term, nest=nest);
-        Regex::new(&pat).map_err(::Error::from)
+        Regex::new(&pat)
+            .map_err(|e| ::Error::from(GffError::from(e)))
     })
 
 }
