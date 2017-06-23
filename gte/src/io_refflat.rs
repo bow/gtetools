@@ -12,6 +12,7 @@ use std::cmp::{max, min};
 use std::convert::AsRef;
 use std::error::Error;
 use std::io;
+use std::num::ParseIntError;
 use std::fs;
 use std::path::Path;
 use std::str::FromStr;
@@ -47,6 +48,12 @@ quick_error! {
         }
         MissingTranscriptId {
             description("transcript identifier attribute not found")
+        }
+        ParseInt(err: ParseIntError, tid: Option<String>) {
+            description(err.description())
+            display(self_) -> ("{}, transcript ID: {}",
+                               self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
+            cause(err)
         }
     }
 }
@@ -164,8 +171,10 @@ impl RefFlatRecord {
 
     pub fn try_from_row(row: RefFlatRow) -> ::Result<Self> {
 
-        let exon_starts = Self::parse_coords(row.9.as_str())?;
-        let exon_ends = Self::parse_coords(row.10.as_str())?;
+        let exon_starts = Self::parse_coords(row.9.as_str(), row.1.as_str())
+            .map_err(::Error::from)?;
+        let exon_ends = Self::parse_coords(row.10.as_str(), row.1.as_str())
+            .map_err(::Error::from)?;
         if exon_starts.len() != row.8 {
             let err = RefFlatError::ExonCountMismatch(Some(row.1.clone()));
             return Err(::Error::RefFlat(err));
@@ -218,9 +227,12 @@ impl RefFlatRecord {
     }
 
     #[inline]
-    fn parse_coords(raw_coords: &str) -> ::Result<Vec<u64>> {
+    fn parse_coords(raw_coords: &str, tid: &str) -> Result<Vec<u64>, RefFlatError> {
         let rcoords = raw_coords
-            .trim_matches(',').split(',').map(|item| u64::from_str(item).map_err(::Error::from));
+            .trim_matches(',')
+            .split(',')
+            .map(|item| u64::from_str(item)
+                 .map_err(|e| RefFlatError::ParseInt(e, Some(tid.to_owned()))));
 
         let mut res = vec![];
         for rcoord in rcoords {
