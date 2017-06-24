@@ -12,10 +12,23 @@ use multimap::MultiMap;
 use regex::{Error as RegexError, Regex};
 
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, Strand, TBuilder, Transcript,
-     RawTrxCoords};
-use consts::*;
+     RawTrxCoords, INIT_START, INIT_END, INIT_COORD, DEF_ID};
 use utils::{OptionDeref, update_contig};
 
+
+const GENE_STR: &'static str = "gene";
+const TRANSCRIPT_STR: &'static str = "transcript";
+const EXON_STR: &'static str = "exon";
+const UTR_STR: &'static str = "UTR";
+const UTR5_STR: &'static str = "UTR5";
+const UTR3_STR: &'static str = "UTR3";
+const CDS_STR: &'static str = "CDS";
+const START_CODON_STR: &'static str = "start_codon";
+const STOP_CODON_STR: &'static str = "stop_codon";
+const GENE_ID_STR: &'static str = "gene_id";
+const TRANSCRIPT_ID_STR: &'static str = "transcript_id";
+const UNK_STR: &'static str = ".";
+const UNK_CHAR: char = '.';
 
 quick_error! {
     #[derive(Debug)]

@@ -7,8 +7,7 @@ use bio::utils::Strand;
 use linked_hash_map::LinkedHashMap;
 use multimap::MultiMap;
 
-use {Coord, RawTrxCoords, consts};
-use consts::DEF_ID;
+use {Coord, RawTrxCoords, DEF_ID, INIT_COORD};
 use utils::OptionDeref;
 
 use self::ExonFeatureKind::*;
@@ -201,7 +200,7 @@ impl Exon {
 
     pub fn set_features(&mut self, features: Vec<ExonFeature>) -> Result<(), ModelError> {
         let (new_start, new_end) = features.iter()
-            .fold(consts::INIT_COORD,
+            .fold(INIT_COORD,
                   |acc, x| (min(acc.0, x.start()),
                             max(acc.1, x.end())));
         self.interval = coord_to_interval(new_start, new_end)?;

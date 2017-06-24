@@ -21,7 +21,7 @@ use csv;
 use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
-use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, consts};
+use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, DEF_ID, INIT_COORD};
 use utils::{OptionDeref, update_contig};
 
 
@@ -31,17 +31,17 @@ quick_error! {
         ExonCountMismatch(tid: Option<String>) {
             description("number of exons and number of exon coordinates are not equal")
             display(self_) -> ("{}, transcript ID: {}",
-                               self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
         ExonCoordsMismatch(tid: Option<String>) {
             description("number of exon start and stop coordinates are not equal")
             display(self_) -> ("{}, transcript ID: {}",
-                               self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
         DuplicateTranscriptId(gid: Option<String>) {
             description("gene has multiple transcripts with the same identifier")
             display(self_) -> ("{}, gene ID: {}",
-                               self_.description(), gid.as_deref().unwrap_or(consts::DEF_ID))
+                               self_.description(), gid.as_deref().unwrap_or(DEF_ID))
         }
         MissingGeneId {
             description("gene identifier attribute not found")
@@ -52,7 +52,7 @@ quick_error! {
         ParseInt(err: ParseIntError, tid: Option<String>) {
             description(err.description())
             display(self_) -> ("{}, transcript ID: {}",
-                               self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
+                               self_.description(), tid.as_deref().unwrap_or(DEF_ID))
             cause(err)
         }
         Csv(err: csv::Error) {
@@ -372,7 +372,7 @@ impl<'a, R> RefFlatGenesStream<'a, R> where R: io::Read {
 
             Some((gid, seq_name, strand_char)) => {
                 let mut transcripts = LinkedHashMap::new();
-                let (mut gene_start, mut gene_end) = consts::INIT_COORD;
+                let (mut gene_start, mut gene_end) = INIT_COORD;
                 for record in records {
                     let transcript = record.and_then(|rec| rec.into_transcript())?;
                     gene_start = min(gene_start, transcript.start());
