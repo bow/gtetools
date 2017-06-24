@@ -96,8 +96,8 @@ pub struct Reader<R: io::Read> {
     inner: gff::Reader<R>,
     gene_id_attr: String,
     transcript_id_attr: String,
-    contig_prefix: Option<String>,
-    contig_lstrip: Option<String>,
+    seq_name_prefix: Option<String>,
+    seq_name_lstrip: Option<String>,
     loose_codons: bool,
     pub(crate) gff_type: GffType,
 }
@@ -109,8 +109,8 @@ impl<R: io::Read> Reader<R> {
             inner: gff::Reader::new(in_reader, gff_type),
             gene_id_attr: GENE_ID_STR.to_owned(),
             transcript_id_attr: TRANSCRIPT_ID_STR.to_owned(),
-            contig_prefix: None,
-            contig_lstrip: None,
+            seq_name_prefix: None,
+            seq_name_lstrip: None,
             loose_codons: false,
             gff_type: gff_type.clone(),
         }
@@ -130,17 +130,17 @@ impl<R: io::Read> Reader<R> {
         self
     }
 
-    pub fn contig_prefix<T>(&mut self, prefix: Option<T>) -> &mut Self
+    pub fn seq_name_prefix<T>(&mut self, prefix: Option<T>) -> &mut Self
         where T: Into<String>
     {
-        self.contig_prefix = prefix.map(|v| v.into());
+        self.seq_name_prefix = prefix.map(|v| v.into());
         self
     }
 
-    pub fn contig_lstrip<T>(&mut self, lstrip: Option<T>) -> &mut Self
+    pub fn seq_name_lstrip<T>(&mut self, lstrip: Option<T>) -> &mut Self
         where T: Into<String>
     {
-        self.contig_lstrip = lstrip.map(|v| v.into());
+        self.seq_name_lstrip = lstrip.map(|v| v.into());
         self
     }
 
@@ -153,8 +153,8 @@ impl<R: io::Read> Reader<R> {
 
         let gid_regex = make_gff_id_regex(self.gene_id_attr.as_str(), self.gff_type)?;
         let tid_regex = make_gff_id_regex(self.transcript_id_attr.as_str(), self.gff_type)?;
-        let prefix = self.contig_prefix.clone();
-        let lstrip = self.contig_lstrip.clone();
+        let prefix = self.seq_name_prefix.clone();
+        let lstrip = self.seq_name_lstrip.clone();
 
         let mut parts = Vec::new();
         for result in self.raw_rows_stream() {

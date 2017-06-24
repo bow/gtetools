@@ -249,8 +249,8 @@ impl RefFlatRecord {
 
 pub struct Reader<R: io::Read> {
     inner: csv::Reader<R>,
-    contig_prefix: Option<String>,
-    contig_lstrip: Option<String>,
+    seq_name_prefix: Option<String>,
+    seq_name_lstrip: Option<String>,
 }
 
 impl<R: io::Read> Reader<R> {
@@ -260,30 +260,30 @@ impl<R: io::Read> Reader<R> {
             inner: csv::Reader::from_reader(in_reader)
                 .delimiter(b'\t')
                 .has_headers(false),
-            contig_prefix: None,
-            contig_lstrip: None,
+            seq_name_prefix: None,
+            seq_name_lstrip: None,
         }
     }
 
-    pub fn contig_prefix<T>(&mut self, prefix: T) -> &mut Self
+    pub fn seq_name_prefix<T>(&mut self, prefix: T) -> &mut Self
         where T: Into<String>
     {
-        self.contig_prefix = Some(prefix.into());
+        self.seq_name_prefix = Some(prefix.into());
         self
     }
 
-    pub fn contig_lstrip<T>(&mut self, lstrip: T) -> &mut Self
+    pub fn seq_name_lstrip<T>(&mut self, lstrip: T) -> &mut Self
         where T: Into<String>
     {
-        self.contig_lstrip = Some(lstrip.into());
+        self.seq_name_lstrip = Some(lstrip.into());
         self
     }
 
     pub fn records_stream(&mut self) -> RefFlatRecordsStream<R> {
         RefFlatRecordsStream {
             inner: self.inner.decode(),
-            contig_prefix: self.contig_prefix.as_deref(),
-            contig_lstrip: self.contig_lstrip.as_deref(),
+            seq_name_prefix: self.seq_name_prefix.as_deref(),
+            seq_name_lstrip: self.seq_name_lstrip.as_deref(),
         }
     }
 
@@ -309,8 +309,8 @@ impl Reader<fs::File> {
 
 pub struct RefFlatRecordsStream<'a, R: 'a> where R: io::Read {
     inner: csv::DecodedRecords<'a, R, RefFlatRow>,
-    contig_prefix: Option<&'a str>,
-    contig_lstrip: Option<&'a str>,
+    seq_name_prefix: Option<&'a str>,
+    seq_name_lstrip: Option<&'a str>,
 }
 
 impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
@@ -318,8 +318,8 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
     type Item = ::Result<RefFlatRecord>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let lstrip = self.contig_lstrip.map(|v| (v, v.len()));
-        let prefix = self.contig_prefix;
+        let lstrip = self.seq_name_lstrip.map(|v| (v, v.len()));
+        let prefix = self.seq_name_prefix;
         self.inner.next()
             .map(|row| {
                 row
