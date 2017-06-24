@@ -13,7 +13,7 @@ use regex::{Error as RegexError, Regex};
 
 use {Coord, Exon, ExonFeatureKind as EFK, Gene, Strand, TBuilder, Transcript,
      RawTrxCoords, INIT_START, INIT_END, INIT_COORD, DEF_ID};
-use utils::{OptionDeref, update_contig};
+use utils::{OptionDeref, update_seq_name};
 
 
 const GENE_STR: &'static str = "gene";
@@ -159,7 +159,8 @@ impl<R: io::Read> Reader<R> {
         let mut parts = Vec::new();
         for result in self.raw_rows_stream() {
             let mut row = result.map_err(::Error::from)?;
-            update_contig(&mut row.0, prefix.as_deref(), lstrip.as_deref().map(|v| (v, v.len())));
+            update_seq_name(&mut row.0, prefix.as_deref(),
+                            lstrip.as_deref().map(|v| (v, v.len())));
             match row.2.as_str() {
                 TRANSCRIPT_STR | EXON_STR | CDS_STR | START_CODON_STR | STOP_CODON_STR => {
                     let rf = TrxPart::try_from_row(row, &gid_regex, &tid_regex)

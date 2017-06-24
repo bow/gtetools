@@ -22,7 +22,7 @@ use itertools::{GroupBy, Group, Itertools};
 use linked_hash_map::LinkedHashMap;
 
 use {Coord, Gene, GBuilder, Strand, Transcript, TBuilder, DEF_ID, INIT_COORD};
-use utils::{OptionDeref, update_contig};
+use utils::{OptionDeref, update_seq_name};
 
 
 quick_error! {
@@ -325,7 +325,7 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
                 row
                     .or_else(|err| Err(::Error::from(RefFlatError::from(err))))
                     .map(|mut row| {
-                        update_contig(&mut row.2, prefix, lstrip);
+                        update_seq_name(&mut row.2, prefix, lstrip);
                         row
                     })
                     .and_then(RefFlatRecord::try_from_row)

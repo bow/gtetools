@@ -96,7 +96,7 @@ mod utils {
     }
 
     #[inline]
-    pub(crate) fn update_contig<'a>(
+    pub(crate) fn update_seq_name<'a>(
         value: &'a mut String,
         prefix: Option<&'a str>,
         lstrip: Option<(&'a str, usize)>,
