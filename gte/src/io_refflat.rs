@@ -55,6 +55,11 @@ quick_error! {
                                self_.description(), tid.as_deref().unwrap_or(consts::DEF_ID))
             cause(err)
         }
+        Csv(err: csv::Error) {
+            description(err.description())
+            from()
+            cause(err)
+        }
     }
 }
 
@@ -318,7 +323,7 @@ impl<'a, R> Iterator for RefFlatRecordsStream<'a, R> where R: io::Read {
         self.inner.next()
             .map(|row| {
                 row
-                    .or_else(|err| Err(::Error::from(err)))
+                    .or_else(|err| Err(::Error::from(RefFlatError::from(err))))
                     .map(|mut row| {
                         update_contig(&mut row.2, prefix, lstrip);
                         row
@@ -418,7 +423,7 @@ impl<W: io::Write> Writer<W> {
         self.inner
             .encode((&row.0, &row.1, &row.2, row.3, row.4, row.5, row.6, row.7, row.8,
                      &row.9, &row.10))
-            .map_err(::Error::from)
+            .map_err(|e| ::Error::from(RefFlatError::from(e)))
     }
 
     pub fn write_record(&mut self, record: &RefFlatRecord) -> ::Result<()> {
@@ -431,7 +436,7 @@ impl<W: io::Write> Writer<W> {
                      record.strand, record.transcript_start, record.transcript_end,
                      record.coding_start, record.coding_end, record.num_exons(),
                      exon_starts, exon_ends))
-            .map_err(::Error::from)
+            .map_err(|e| ::Error::from(RefFlatError::from(e)))
     }
 
     pub fn write_transcript(&mut self, transcript: &Transcript) -> ::Result<()> {
@@ -452,7 +457,7 @@ impl<W: io::Write> Writer<W> {
                      transcript.start(), transcript.end(),
                      coding_start, coding_end, transcript.exons().len(),
                      exon_starts, exon_ends))
-            .map_err(::Error::from)
+            .map_err(|e| ::Error::from(RefFlatError::from(e)))
     }
 
     pub fn write_gene(&mut self, gene: &Gene) -> ::Result<()> {
