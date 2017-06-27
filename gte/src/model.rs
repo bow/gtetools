@@ -1,3 +1,6 @@
+/*! Core gene, transcript, and exon models and builders.
+
+*/
 use std::cmp::{max, min};
 use std::mem;
 use std::error::Error;
@@ -18,54 +21,66 @@ macro_rules! impl_common {
 
         impl $struct_ty {
 
+            /// Returns the sequence name.
             pub fn seq_name(&self) -> &str {
                 self.seq_name.as_str()
             }
 
+            /// Sets the sequence name.
             pub fn set_seq_name<T>(&mut self, name: T)
                 where T: Into<String>
             {
                 self.seq_name = name.into()
             }
 
+            /// Returns the identifier.
             pub fn id(&self) -> Option<&str> {
                 self.id.as_deref()
             }
 
+            /// Returns a reference of the strand.
             pub fn strand(&self) -> &Strand {
                 &self.strand
             }
 
+            /// Sets the strand.
             pub fn set_strand(&mut self, strand: Strand) {
                 self.strand = strand
             }
 
+            /// Returns a reference of the attributes.
             pub fn attributes(&self) -> &MultiMap<String, String> {
                 &self.attributes
             }
 
+            /// Returns a mutable reference of the attributes.
             pub fn attributes_mut(&mut self) -> &mut MultiMap<String, String> {
                 &mut self.attributes
             }
 
+            /// Sets the attribute and returns the old value.
             pub fn set_attributes(&mut self, attributes: MultiMap<String, String>)
                 -> MultiMap<String, String>
             {
                 mem::replace(&mut self.attributes, attributes)
             }
 
+            /// Returns a reference of the interval.
             pub fn interval(&self) -> &Interval<u64> {
                 &self.interval
             }
 
+            /// Returns the genome-wise 5'-most coordinate.
             pub fn start(&self) -> u64 {
                 self.interval.start
             }
 
+            /// Returns the genome-wise 3'-most coordinate.
             pub fn end(&self) -> u64 {
                 self.interval.end
             }
 
+            /// Returns the number of bases spanned by the interval.
             #[inline]
             pub fn span(&self) -> u64 {
                 self.end() - self.start()
@@ -75,6 +90,7 @@ macro_rules! impl_common {
     );
 }
 
+/// Genomic feature spanning an interval.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Feature<K: FeatureKind> {
     interval: Interval<u64>,
@@ -83,6 +99,7 @@ pub struct Feature<K: FeatureKind> {
 
 impl<K: FeatureKind> Feature<K> {
 
+    /// Creates a new feature.
     pub fn new(interval: Interval<u64>, kind: K) -> Self {
         Feature {
             interval: interval,
@@ -90,62 +107,104 @@ impl<K: FeatureKind> Feature<K> {
         }
     }
 
+    /// Returns a reference of the feature kind.
     pub fn kind(&self) -> &K {
         &self.kind
     }
 
+    /// Returns a reference of the feature interval.
     pub fn interval(&self) -> &Interval<u64> {
         &self.interval
     }
 
+    /// Returns the genome-wise 5'-most coordinate of the feature.
     pub fn start(&self) -> u64 {
         self.interval.start
     }
 
+    /// Returns the genome-wise 3'-most coordinate of the feature.
     pub fn end(&self) -> u64 {
         self.interval.end
     }
 
+    /// Returns the number of bases spanned by the feature interval.
     #[inline]
     pub fn span(&self) -> u64 {
         self.end() - self.start()
     }
 }
 
+/// Marker trait for feature kinds.
 pub trait FeatureKind {}
 
+/// Possible feature kinds for exons.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExonFeatureKind {
+    /// UTR on unknown strands.
     UTR,
+    /// 5'UTR.
     UTR5,
+    /// 3'UTR.
     UTR3,
-    CDS { frame: Option<u8> },
-    StartCodon { frame: Option<u8> },
-    StopCodon { frame: Option<u8> },
+    /// CDS.
+    CDS {
+        /// Frame of the CDS.
+        ///
+        /// This is the number of bases that needs to be removed from the transcript-wise 5'
+        /// so that the translation is in-frame.
+        frame: Option<u8>
+    },
+    /// Start codon.
+    StartCodon {
+        /// Frame of the start codon.
+        ///
+        /// This is the number of bases that needs to be removed from the transcript-wise 5'
+        /// so that the translation is in-frame.
+        frame: Option<u8>
+    },
+    /// Stop codon.
+    StopCodon {
+        /// Frame of the stop codon.
+        ///
+        /// This is the number of bases that needs to be removed from the transcript-wise 5'
+        /// so that the translation is in-frame.
+        frame: Option<u8>
+    },
+    /// Other features that may exist within exons.
     Any(String),
 }
 
 impl FeatureKind for ExonFeatureKind {}
 
+/// Type alias for exon features.
 pub type ExonFeature = Feature<ExonFeatureKind>;
 
+/// Possible feature kinds for transcripts.
 #[derive(Debug, Clone, PartialEq)]
 pub enum TranscriptFeatureKind {
+    /// An intron.
     Intron,
+    /// Other features that may exist within transcripts.
     Any(String),
 }
 
 impl FeatureKind for TranscriptFeatureKind {}
 
+/// Type alias for transcript features.
 pub type TranscriptFeature = Feature<TranscriptFeatureKind>;
 
+/// Feature kind for genes.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeneFeatureKind(String);
 
 impl FeatureKind for GeneFeatureKind {}
 
+/// Type alias for gene features.
 pub type GeneFeature = Feature<GeneFeatureKind>;
 
+/// The exon model.
+///
+/// To create an exon, an `EBuilder` needs to be used.
 #[derive(Debug, Clone)]
 pub struct Exon {
     seq_name: String,
@@ -162,40 +221,52 @@ impl_common!(Exon);
 
 impl Exon {
 
+    /// Sets the exon identifier.
     pub fn set_id<T>(&mut self, id: Option<T>)
         where T: Into<String>
     {
         self.id = id.map(|v| v.into())
     }
 
+    /// Returns the identifier of the transcript of the exon.
     pub fn transcript_id(&self) -> Option<&str> {
         self.transcript_id.as_deref()
     }
 
+    /// Sets the transcript identifier of the exon.
     pub fn set_transcript_id<T>(&mut self, transcript_id: Option<T>)
         where T: Into<String>
     {
         self.transcript_id = transcript_id.map(|v| v.into())
     }
 
+    /// Returns the identifier of the gene of the exon.
     pub fn gene_id(&self) -> Option<&str> {
         self.gene_id.as_deref()
     }
 
+    /// Sets the gene identifier of the exon.
     pub fn set_gene_id<T>(&mut self, gene_id: Option<T>)
         where T: Into<String>
     {
         self.gene_id = gene_id.map(|v| v.into())
     }
 
+    /// Returns a slice of the features within the exon.
     pub fn features(&self) -> &[ExonFeature] {
         self.features.as_slice()
     }
 
+    /// Returns a mutable slice of the features within the exon.
     pub fn features_mut(&mut self) -> &mut [ExonFeature] {
         self.features.as_mut_slice()
     }
 
+    /// Sets the exon features and return the old value.
+    ///
+    /// If the given features is nonempty, the exon interval will also be updated with the
+    /// minimum and maximum coordinate of the features. Otherwise, the exon coordinate is left
+    /// unchanged.
     pub fn set_features(&mut self, features: Vec<ExonFeature>)
         -> Result<Vec<ExonFeature>, ModelError>
     {
@@ -212,6 +283,10 @@ impl Exon {
     }
 }
 
+/// Builder for exons.
+///
+/// This builder stores possible configuration values that will be used for creating an exon
+/// via its `build` function.
 #[derive(Debug)]
 pub struct EBuilder {
     seq_name: String,
@@ -228,6 +303,7 @@ pub struct EBuilder {
 
 impl EBuilder {
 
+    /// Creates a new builder for an exon with the given values.
     pub fn new<T>(seq_name: T, start: u64, end: u64) -> Self
         where T: Into<String>
     {
@@ -245,16 +321,30 @@ impl EBuilder {
         }
     }
 
+    /// Sets the strand of the exon.
     pub fn strand(mut self, strand: Strand) -> Self {
         self.strand = Some(strand);
         self
     }
 
+    /// Sets the strand of the exon using its char representation.
+    ///
+    /// The character will be interpreted as follows:
+    ///
+    /// * `+`, `f`, or `F` becomes `Strand::Forward`
+    /// * `-`, `r`, or `R` becomes `Strand::Reverse`
+    /// * `.`, `?` becomes `Strand::Unknown`
+    /// * Other characters will cause the `build` method call to return an error.
+    ///
+    /// This method may be invoked with or without the `strand` method. If it is invoked with
+    /// the `strand` method, the resulting strand must be the same enum. Otherwise the `build`
+    /// method call will return an error.
     pub fn strand_char(mut self, strand_char: char) -> Self {
         self.strand_char = Some(strand_char);
         self
     }
 
+    /// Sets the identifier of the exon.
     pub fn id<T>(mut self, id: T) -> Self
         where T: Into<String>
     {
@@ -262,6 +352,7 @@ impl EBuilder {
         self
     }
 
+    /// Sets the transcript identifier of the exon.
     pub fn transcript_id<T>(mut self, transcript_id: T) -> Self
         where T: Into<String>
     {
@@ -269,6 +360,7 @@ impl EBuilder {
         self
     }
 
+    /// Sets the gene identifier of the exon.
     pub fn gene_id<T>(mut self, gene_id: T) -> Self
         where T: Into<String>
     {
@@ -276,6 +368,7 @@ impl EBuilder {
         self
     }
 
+    /// Sets a single attribute of the exon.
     pub fn attribute<K, V>(mut self, key: K, value: V) -> Self
         where K: Into<String>, V: Into<String>
     {
@@ -283,21 +376,25 @@ impl EBuilder {
         self
     }
 
+    /// Sets the entire attribute of the exon.
     pub fn attributes(mut self, attributes: MultiMap<String, String>) -> Self {
         self.attributes = attributes;
         self
     }
 
+    /// Adds a feature to the exon.
     pub fn feature(mut self, feature: ExonFeature) -> Self {
         self.features.push(feature);
         self
     }
 
+    /// Sets all the features of the exon.
     pub fn features(mut self, features: Vec<ExonFeature>) -> Self {
         self.features = features;
         self
     }
 
+    /// Validates the input data and builds the exon.
     pub fn build(self) -> ::Result<Exon> {
         let interval = coord_to_interval(self.start, self.end)
             .map_err(::Error::Model)?;
@@ -317,6 +414,9 @@ impl EBuilder {
     }
 }
 
+/// The transcript model.
+///
+/// To create a transcript, a `TBuilder` needs to be used.
 #[derive(Debug, Clone)]
 pub struct Transcript {
     seq_name: String,
@@ -332,6 +432,9 @@ impl_common!(Transcript);
 
 impl Transcript {
 
+    /// Sets the transcript identifier.
+    ///
+    /// This method will also set the transcript identifier values of all the transcript's exons.
     pub fn set_id<T>(&mut self, id: Option<T>)
         where T: Into<String> + Clone
     {
@@ -341,10 +444,12 @@ impl Transcript {
         self.id = id.map(|id| id.into())
     }
 
+    /// Returns the gene identifier of the transcript.
     pub fn gene_id(&self) -> Option<&str> {
         self.gene_id.as_deref()
     }
 
+    /// Sets the gene identifier of the transcript.
     pub fn set_gene_id<T>(&mut self, gene_id: Option<T>)
         where T: Into<String> + Clone
     {
@@ -354,14 +459,26 @@ impl Transcript {
         self.gene_id = gene_id.map(|v| v.into())
     }
 
+    /// Returns a slice of the transcript's exons.
     pub fn exons(&self) -> &[Exon] {
         self.exons.as_slice()
     }
 
+    /// Consumes the transcript and returns its exons.
     pub fn take_exons(self) -> Vec<Exon> {
         self.exons
     }
 
+    /// Returns the genome-wise 5' and 3'-most coordinate of the coding region.
+    ///
+    /// The returned coding region coordinates may include the stop codon, depending on the value
+    /// of the `incl_stop` argument.
+    ///
+    /// The returned value is `None` in any of these cases:
+    ///
+    /// * No coding region is defined.
+    /// * A coding region is defined but the transcript strand is unknown and `incl_stop` is
+    ///   set to `false`.
     pub fn coding_coord(&self, incl_stop: bool) -> Option<Coord<u64>> {
         let start = self.coding_start_coord(incl_stop);
         let end = self.coding_end_coord(incl_stop);
@@ -371,6 +488,7 @@ impl Transcript {
         }
     }
 
+    /// Returns the genome-wise 5'-most coordinate of the coding region.
     fn coding_start_coord(&self, incl_stop: bool) -> Option<u64> {
         match &self.strand {
             &Strand::Forward => {
@@ -414,6 +532,7 @@ impl Transcript {
         }
     }
 
+    /// Returns the genome-wise 3'-most coordinate of the coding region.
     fn coding_end_coord(&self, incl_stop: bool) -> Option<u64> {
         match &self.strand {
             &Strand::Forward => {
@@ -459,6 +578,10 @@ impl Transcript {
 
 }
 
+/// Builder for transcripts.
+///
+/// This builder stores possible configuration values that will be used for creating a transcript
+/// via its `build` function.
 #[derive(Debug)]
 pub struct TBuilder {
     seq_name: String,
@@ -480,6 +603,7 @@ pub struct TBuilder {
 
 impl TBuilder {
 
+    /// Creates a new builder for a transcript with the given values.
     pub fn new<T>(seq_name: T, start: u64, end: u64) -> Self
         where T: Into<String>
     {
@@ -499,16 +623,30 @@ impl TBuilder {
         }
     }
 
+    /// Sets the strand of the transcript.
     pub fn strand(mut self, strand: Strand) -> Self {
         self.strand = Some(strand);
         self
     }
 
+    /// Sets the strand of the transcript using its char representation.
+    ///
+    /// The character will be interpreted as follows:
+    ///
+    /// * `+`, `f`, or `F` becomes `Strand::Forward`
+    /// * `-`, `r`, or `R` becomes `Strand::Reverse`
+    /// * `.`, `?` becomes `Strand::Unknown`
+    /// * Other characters will cause the `build` method call to return an error.
+    ///
+    /// This method may be invoked with or without the `strand` method. If it is invoked with
+    /// the `strand` method, the resulting strand must be the same enum. Otherwise the `build`
+    /// method call will return an error.
     pub fn strand_char(mut self, strand_char: char) -> Self {
         self.strand_char = Some(strand_char);
         self
     }
 
+    /// Sets the identifier of the transcript.
     pub fn id<T>(mut self, id: T) -> Self
         where T: Into<String>
     {
@@ -516,6 +654,7 @@ impl TBuilder {
         self
     }
 
+    /// Sets the gene identifier of the transcript.
     pub fn gene_id<T>(mut self, gene_id: T) -> Self
         where T: Into<String>
     {
@@ -523,6 +662,7 @@ impl TBuilder {
         self
     }
 
+    /// Sets a single attribute of the transcript.
     pub fn attribute<K, V>(mut self, key: K, value: V) -> Self
         where K: Into<String>, V: Into<String>
     {
@@ -530,11 +670,13 @@ impl TBuilder {
         self
     }
 
+    /// Sets the entire attribute of the transcript.
     pub fn attributes(mut self, attributes: MultiMap<String, String>) -> Self {
         self.attributes = attributes;
         self
     }
 
+    /// Sets the exons for the transcript.
     pub fn exons(mut self, exons: Vec<Exon>) -> Self {
         self.exons =
             if exons.is_empty() {
@@ -545,6 +687,23 @@ impl TBuilder {
         self
     }
 
+    /// Sets the exons of the transcript by their coordinates.
+    ///
+    /// Optionally, the coding region of the transcript may also be set. If it is set, all exons
+    /// will be filled with the appropriate start codon, CDS, and stop codon features.
+    ///
+    /// Each exon coordinate must conform to these conditions:
+    ///
+    /// * It is a tuple of type `(a: u64, b: u64)`, where `a` <= `b`.
+    /// * None of the coordinate values extend outside of the transcript coordinate.
+    ///
+    /// If any of the conditions are violated, the `build` method will return an error.
+    ///
+    /// The coding coordinate, when defined, is also subject to the same conditions, with the
+    /// addition of each of its element must lie inside any of the exon coordinates.
+    ///
+    /// The coding coordinate may or may not include the stop codon. This is set by the
+    /// `coding_incl_stop` method of the builder.
     pub fn coords<E>(mut self, exon_coords: E, coding_coord: Option<Coord<u64>>) -> Self
         where E: IntoIterator<Item=Coord<u64>>
     {
@@ -553,11 +712,15 @@ impl TBuilder {
         self
     }
 
+    /// Sets the inclusion of stop codon in coding coordinates.
+    ///
+    /// This value is ignored if the `coding_coord` argument of the `coords` method is `None`.
     pub fn coding_incl_stop(mut self, incl_stop: bool) -> Self {
         self.coding_incl_stop = incl_stop;
         self
     }
 
+    /// Validates the input data and builds a transcript.
     pub fn build(self) -> ::Result<Transcript> {
         let interval = coord_to_interval(self.start, self.end)
             .map_err(::Error::Model)?;
@@ -582,6 +745,9 @@ impl TBuilder {
     }
 }
 
+/// The gene model.
+///
+/// To create a gene, a `GBuilder` needs to be used.
 #[derive(Debug, Clone)]
 pub struct Gene {
     seq_name: String,
@@ -596,6 +762,10 @@ impl_common!(Gene);
 
 impl Gene {
 
+    /// Sets the gene identifier.
+    ///
+    /// This method will also set the gene identifier values of all the gene's transcripts and
+    /// exons.
     pub fn set_id<T>(&mut self, id: Option<T>)
         where T: Into<String> + Clone
     {
@@ -605,15 +775,21 @@ impl Gene {
         self.id = id.map(|v| v.into())
     }
 
+    /// Sets the transcripts for the gene.
     pub fn transcripts(&self) -> &LinkedHashMap<String, Transcript> {
         &self.transcripts
     }
 
+    /// Consumes the gene and returns its transcripts.
     pub fn take_transcripts(self) -> LinkedHashMap<String, Transcript> {
         self.transcripts
     }
 }
 
+/// Builder for genes.
+///
+/// This builder stores possible configuration values that will be used for creating a gene
+/// via its `build` function.
 #[derive(Debug)]
 pub struct GBuilder {
     seq_name: String,
@@ -630,6 +806,7 @@ pub struct GBuilder {
 
 impl GBuilder {
 
+    /// Creates a new builder for a gene with the given values.
     pub fn new<T>(seq_name: T, start: u64, end: u64) -> Self
         where T: Into<String>
     {
@@ -647,16 +824,30 @@ impl GBuilder {
         }
     }
 
+    /// Sets the strand of the gene.
     pub fn strand(mut self, strand: Strand) -> Self {
         self.strand = Some(strand);
         self
     }
 
+    /// Sets the strand of the gene using its char representation.
+    ///
+    /// The character will be interpreted as follows:
+    ///
+    /// * `+`, `f`, or `F` becomes `Strand::Forward`
+    /// * `-`, `r`, or `R` becomes `Strand::Reverse`
+    /// * `.`, `?` becomes `Strand::Unknown`
+    /// * Other characters will cause the `build` method call to return an error.
+    ///
+    /// This method may be invoked with or without the `strand` method. If it is invoked with
+    /// the `strand` method, the resulting strand must be the same enum. Otherwise the `build`
+    /// method call will return an error.
     pub fn strand_char(mut self, strand_char: char) -> Self {
         self.strand_char = Some(strand_char);
         self
     }
 
+    /// Sets the identifier of the gene.
     pub fn id<T>(mut self, id: T) -> Self
         where T: Into<String>
     {
@@ -664,6 +855,7 @@ impl GBuilder {
         self
     }
 
+    /// Sets a single attribute of the gene.
     pub fn attribute<K, V>(mut self, key: K, value: V) -> Self
         where K: Into<String>, V: Into<String>
     {
@@ -671,26 +863,44 @@ impl GBuilder {
         self
     }
 
+    /// Sets the entire attribute of the gene.
     pub fn attributes(mut self, attributes: MultiMap<String, String>) -> Self {
         self.attributes = attributes;
         self
     }
 
+    /// Sets the transcripts of the gene.
     pub fn transcripts(mut self, transcripts: LinkedHashMap<String, Transcript>) -> Self {
         self.transcripts = Some(transcripts);
         self
     }
 
+    /// Sets the transcripts of the gene by their coordinates.
+    ///
+    /// The coordinates are supplied as a `LinkedHashMap`, keyed by the transcript identifiers.
+    /// This map is used so that ordering of the transcripts in the gene to build is defined.
+    ///
+    /// The values of this map is a three-element tuple consisting of:
+    ///
+    /// * A tuple of the transcript coordinate.
+    /// * A vector of the exon coordinates for the particular transcript.
+    /// * A coding region that may exist in the transcript.
+    ///
+    /// All coordinates are supplied as two-element tuples `(a: u64, b: u64)` where `a` <= `b`.
     pub fn transcript_coords(mut self, coords: LinkedHashMap<String, RawTrxCoords>)-> Self {
         self.transcript_coords = Some(coords);
         self
     }
 
+    /// Sets the inclusion of stop codon in transcript coding coordinates.
+    ///
+    /// This value is ignored for transcripts whose coding coordinate is set to `None`.
     pub fn transcript_coding_incl_stop(mut self, incl_stop: bool) -> Self {
         self.transcript_coding_incl_stop = incl_stop;
         self
     }
 
+    /// Validates the input data and builds a gene.
     pub fn build(self) -> ::Result<Gene> {
         let interval = coord_to_interval(self.start, self.end)
             .map_err(::Error::Model)?;
@@ -713,8 +923,10 @@ impl GBuilder {
 }
 
 quick_error! {
+    /// Errors that occur when building genes, transcripts, or exons.
     #[derive(Debug)]
     pub enum ModelError {
+        /// Occurs when an invalid coordinate pair is supplied.
         InvalidInterval(err: IntervalError) {
             description(
                 match err {
@@ -724,57 +936,72 @@ quick_error! {
                 })
             from()
         }
+        /// Occurs when an invalid strand character is used.
         InvalidStrandChar(err: bio_utils::StrandError) {
             description(err.description())
             from()
         }
+        /// Occurs when the arguments for the `strand` and `strand_char` methods in builders
+        /// resolve to different strands.
         ConflictingStrand {
             description("conflicting strand inputs specified")
         }
+        /// Occurs when a builder is created without specifying its strand.
         UnspecifiedStrand {
             description("strand not specified")
         }
+        /// Occurs when an invalid interval is used for creating an exon.
         InvalidExonInterval(tid: Option<String>) {
             description("exon has larger start than end coordinate")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when an invalid interval is used as the coding interval.
         InvalidCodingInterval(tid: Option<String>) {
             description("coding region has larger start than end coordinate")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Internal error that occurs when a non-empty exon vector is expected.
         UnspecifiedExons(tid: Option<String>) {
             description("transcript is defined without exons")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when the first and/or last exon coordinates do not match the transcript
+        /// coordinates.
         UnmatchedExons(tid: Option<String>) {
             description("first and/or last exon coordinates do not match transcript \
                          start and/or end coordinates")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when the supplied coding region leaves no room for stop codons in the
+        /// transcript.
         CodingTooLarge(tid: Option<String>) {
             description("coding region leaves no room for stop codon in transcript")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when the supplied coding interval is too small for a start codon.
         CodingTooSmall(tid: Option<String>) {
             description("coding region leaves no room for start codon")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when the supplied coding interval extends over the transcript interval.
         CodingNotFullyEnveloped(tid: Option<String>) {
             description("coding region not fully enveloped by exons")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when the supplied coding interval start and/or ends outside of an exon.
         CodingInIntron(tid: Option<String>) {
             description("coding start and/or end lies in introns")
             display(self_) -> ("{}, transcript ID: {}",
                                self_.description(), tid.as_deref().unwrap_or(DEF_ID))
         }
+        /// Occurs when the supplied transcript interval extends over its gene interval.
         TranscriptNotFullyEnveloped(tid: Option<String>) {
             description("transcript coordinate not fully enveloped in gene coordinate")
             display(self_) -> ("{}, transcript ID: {}",
@@ -783,6 +1010,7 @@ quick_error! {
     }
 }
 
+/// Resolves the `strand` and `strand_char` arguments given to builders.
 fn resolve_strand_input(
     strand: Option<Strand>,
     strand_char: Option<char>)
@@ -803,6 +1031,7 @@ fn resolve_strand_input(
     }
 }
 
+/// Resolves the exon inputs given to a `TBuilder`.
 fn resolve_exons_input(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
@@ -836,6 +1065,7 @@ fn resolve_exons_input(
     }
 }
 
+/// Resolves the transcript inputs given to a `GBuilder`.
 fn resolve_transcripts_input(
     gene_seqname: &String,
     gene_interval: &Interval<u64>,
@@ -883,6 +1113,7 @@ fn resolve_transcripts_input(
     }
 }
 
+/// Infers exons and their features given coordinate values and identifiers.
 fn infer_exons(
     transcript_seqname: &String,
     transcript_interval: &Interval<u64>,
@@ -981,6 +1212,7 @@ fn infer_exons(
     }
 }
 
+/// Adjusts the given coding coordinates so that the stop codon is excluded.
 fn adjust_coding_coord(mut start: u64, mut end: u64,
                        strand: &Strand, exon_coords: &Vec<Coord<u64>>
 ) -> Option<Coord<u64>>
@@ -1016,15 +1248,15 @@ fn adjust_coding_coord(mut start: u64, mut end: u64,
     Some((start, end))
 }
 
+/// Helper function to create an interval from start and end coordinates.
 #[inline(always)]
 fn coord_to_interval(start: u64, end: u64) -> Result<Interval<u64>, ModelError> {
     Interval::new(start..end).map_err(ModelError::from)
 }
 
-// requirements:
-//  - exon coords sorted and nonempty
-//  - coding coord within exon span
-//  - coding_coord.0 < coding_coord.1
+/// Infers features of exons given coordinate values and identifiers.
+///
+/// This functions assumes some validation on the coordinates have been done.
 fn infer_exon_features(
     exon_coords: &Vec<Coord<u64>>,
     coding_r: Coord<u64>,
@@ -1406,7 +1638,7 @@ fn infer_exon_features(
     Ok(exons)
 }
 
-// Helper function for backtracking and adding possibly skipped features
+/// Helper function for adding features when the transcript is on the reverse strand.
 fn backtrack_and_push<F>(
     exons: &mut Vec<Exon>,
     efk: ExonFeatureKind,
@@ -1444,6 +1676,7 @@ where F: Fn(u64, u64, ExonFeatureKind) -> ExonFeature
     codon_rem
 }
 
+/// Helper function to set the frames of exon features in a transcript.
 fn set_coding_frames<'a, T>(exons_miter: T)
 where T: Iterator<Item=&'a mut Exon>
 {
@@ -1469,8 +1702,9 @@ where T: Iterator<Item=&'a mut Exon>
     }
 }
 
-#[inline(always)]
 // Adapted from: http://mblab.wustl.edu/GTF22.html
+/// Helper function to calculate the frame of subsequent feature.
+#[inline(always)]
 fn calc_next_frame(cur_span: u64, cur_frame: u8) -> u8 {
     let cast_cur_frame = cur_frame as u64;
     let result =
