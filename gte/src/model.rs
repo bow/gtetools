@@ -48,12 +48,10 @@ macro_rules! impl_common {
                 &mut self.attributes
             }
 
-            pub fn set_attributes(&mut self, attributes: MultiMap<String, String>) {
-                self.attributes = attributes
-            }
-
-            pub fn take_attributes(&mut self) -> MultiMap<String, String> {
-                mem::replace(&mut self.attributes, MultiMap::new())
+            pub fn set_attributes(&mut self, attributes: MultiMap<String, String>)
+                -> MultiMap<String, String>
+            {
+                mem::replace(&mut self.attributes, attributes)
             }
 
             pub fn interval(&self) -> &Interval<u64> {

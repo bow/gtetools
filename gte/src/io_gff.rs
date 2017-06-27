@@ -443,7 +443,7 @@ impl Gene {
     // TODO: also handle gene-level features
     pub fn into_gff_records(mut self) -> ::Result<Vec<gff::Record>> {
 
-        let mut attribs = self.take_attributes();
+        let mut attribs = self.set_attributes(MultiMap::new());
 
         self.id()
             .ok_or(GffError::MissingGeneId)
@@ -484,7 +484,7 @@ impl Transcript {
     // TODO: also handle transcript-level features
     pub fn into_gff_records(mut self) -> ::Result<Vec<gff::Record>> {
 
-        let mut attribs = self.take_attributes();
+        let mut attribs = self.set_attributes(MultiMap::new());
 
         self.gene_id()
             .ok_or(GffError::MissingGeneId)
@@ -538,7 +538,7 @@ impl Exon {
 
     pub fn into_gff_records(mut self) -> ::Result<Vec<gff::Record>> {
 
-        let mut attribs = self.take_attributes();
+        let mut attribs = self.set_attributes(MultiMap::new());
 
         self.gene_id()
             .ok_or(GffError::MissingGeneId)
