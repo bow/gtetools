@@ -16,6 +16,7 @@ use utils::OptionDeref;
 use self::ExonFeatureKind::*;
 
 
+/// Macro for implementing methods shared by the gene, transcript, and exon models.
 macro_rules! impl_common {
     ($struct_ty:ty) => (
 
