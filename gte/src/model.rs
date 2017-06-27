@@ -196,18 +196,19 @@ impl Exon {
         self.features.as_mut_slice()
     }
 
-    pub fn set_features(&mut self, features: Vec<ExonFeature>) -> Result<(), ModelError> {
-        let (new_start, new_end) = features.iter()
-            .fold(INIT_COORD,
-                  |acc, x| (min(acc.0, x.start()),
-                            max(acc.1, x.end())));
-        self.interval = coord_to_interval(new_start, new_end)?;
-        self.features = features;
-        Ok(())
-    }
-
-    pub fn take_features(self) -> Vec<ExonFeature> {
-        self.features
+    pub fn set_features(&mut self, features: Vec<ExonFeature>)
+        -> Result<Vec<ExonFeature>, ModelError>
+    {
+        if features.is_empty() {
+            Ok(mem::replace(&mut self.features, features))
+        } else {
+            let (new_start, new_end) = features.iter()
+                .fold(INIT_COORD,
+                    |acc, x| (min(acc.0, x.start()),
+                                max(acc.1, x.end())));
+            self.interval = coord_to_interval(new_start, new_end)?;
+            Ok(mem::replace(&mut self.features, features))
+        }
     }
 }
 
