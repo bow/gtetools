@@ -4,7 +4,7 @@ extern crate gte;
 #[macro_use]
 extern crate quick_error;
 
-use std::io::{self, Write};
+use std::io;
 use std::process;
 use std::result;
 
@@ -87,7 +87,7 @@ fn run(matches: ArgMatches) -> ::Result<()> {
 fn main() {
     let matches = build_cli::<'static, 'static>().get_matches();
     if let Err(err) = run(matches) {
-        let _ = writeln!(io::stderr(), "error: {}", err);
+        eprintln!("error: {}", err);
         process::exit(1);
     }
     process::exit(0);

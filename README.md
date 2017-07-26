@@ -12,7 +12,7 @@ Since gtetools is still in alpha, please follow the [development setup](#develop
 
 # Development Setup
 
-gtetools is written in the Rust programming language (v1.18 or above). If you do not have the Rust toolchain
+gtetools is written in the Rust programming language (v1.19 or above). If you do not have the Rust toolchain
 installed yet, you will need to install it. The Rust [official installation guide](https://www.rustup.rs/) is
 easy to follow and should get you going in no time.
 
