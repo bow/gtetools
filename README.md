@@ -1,3 +1,8 @@
+# :warning: archived
+
+I am no longer working on this repository and have therefore decided to archive it.
+
+
 # gtetools
 
 [![Build Status](https://travis-ci.org/bow/gtetools.svg?branch=master)](https://travis-ci.org/bow/gtetools)
